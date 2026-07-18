@@ -256,6 +256,8 @@ function areWorktreesEqual(current: Worktree[] | undefined, next: Worktree[]): b
       worktree.linkedBitbucketPR === candidate.linkedBitbucketPR &&
       worktree.linkedAzureDevOpsPR === candidate.linkedAzureDevOpsPR &&
       worktree.linkedGiteaPR === candidate.linkedGiteaPR &&
+      worktree.linkedGiteePR === candidate.linkedGiteePR &&
+      worktree.linkedGiteeIssue === candidate.linkedGiteeIssue &&
       worktree.isArchived === candidate.isArchived &&
       worktree.isUnread === candidate.isUnread &&
       worktree.isPinned === candidate.isPinned &&
@@ -1404,13 +1406,15 @@ type HostedReviewLinkKey =
   | 'linkedBitbucketPR'
   | 'linkedAzureDevOpsPR'
   | 'linkedGiteaPR'
+  | 'linkedGiteePR'
 
 const HOSTED_REVIEW_LINK_KEYS: readonly HostedReviewLinkKey[] = [
   'linkedPR',
   'linkedGitLabMR',
   'linkedBitbucketPR',
   'linkedAzureDevOpsPR',
-  'linkedGiteaPR'
+  'linkedGiteaPR',
+  'linkedGiteePR'
 ]
 
 const CLEARED_HOSTED_REVIEW_LINK_UPDATES: Pick<WorktreeMeta, HostedReviewLinkKey | 'pushTarget'> = {
@@ -1419,6 +1423,7 @@ const CLEARED_HOSTED_REVIEW_LINK_UPDATES: Pick<WorktreeMeta, HostedReviewLinkKey
   linkedBitbucketPR: null,
   linkedAzureDevOpsPR: null,
   linkedGiteaPR: null,
+  linkedGiteePR: null,
   pushTarget: undefined
 }
 
@@ -1564,6 +1569,7 @@ function getHostedReviewLinkUpdates(
     linkedBitbucketPR: worktree.linkedBitbucketPR ?? null,
     linkedAzureDevOpsPR: worktree.linkedAzureDevOpsPR ?? null,
     linkedGiteaPR: worktree.linkedGiteaPR ?? null,
+    linkedGiteePR: worktree.linkedGiteePR ?? null,
     pushTarget: worktree.pushTarget
   }
 }
@@ -3016,7 +3022,9 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
     linkedAzureDevOpsPR,
     linkedGiteaPR,
     compareBaseRef,
-    options
+    options,
+    linkedGiteePR,
+    linkedGiteeIssue
   ) => {
     const automationProvenanceRequest = options?.automationProvenanceRequest
     try {
@@ -3068,6 +3076,8 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
             ...(linkedBitbucketPR !== undefined ? { linkedBitbucketPR } : {}),
             ...(linkedAzureDevOpsPR !== undefined ? { linkedAzureDevOpsPR } : {}),
             ...(linkedGiteaPR !== undefined ? { linkedGiteaPR } : {}),
+            ...(linkedGiteePR !== undefined ? { linkedGiteePR } : {}),
+            ...(linkedGiteeIssue !== undefined ? { linkedGiteeIssue } : {}),
             ...(startup ? { startup } : {}),
             ...(creationId ? { creationId } : {}),
             ...(automationProvenanceRequest ? { automationProvenanceRequest } : {})
@@ -3113,6 +3123,8 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
                     ...(linkedBitbucketPR !== undefined ? { linkedBitbucketPR } : {}),
                     ...(linkedAzureDevOpsPR !== undefined ? { linkedAzureDevOpsPR } : {}),
                     ...(linkedGiteaPR !== undefined ? { linkedGiteaPR } : {}),
+                    ...(linkedGiteePR !== undefined ? { linkedGiteePR } : {}),
+                    ...(linkedGiteeIssue !== undefined ? { linkedGiteeIssue } : {}),
                     ...(automationProvenanceRequest ? { automationProvenanceRequest } : {}),
                     ...(startup
                       ? {
@@ -3877,7 +3889,9 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
       (normalizedUpdates.linkedAzureDevOpsPR === null &&
         (worktreeForUpdate?.linkedAzureDevOpsPR ?? null) !== null) ||
       (normalizedUpdates.linkedGiteaPR === null &&
-        (worktreeForUpdate?.linkedGiteaPR ?? null) !== null)
+        (worktreeForUpdate?.linkedGiteaPR ?? null) !== null) ||
+      (normalizedUpdates.linkedGiteePR === null &&
+        (worktreeForUpdate?.linkedGiteePR ?? null) !== null)
     const reviewRepo = shouldRefreshHostedReview
       ? get().repos.find((repo) => repo.id === worktreeForUpdate?.repoId)
       : undefined
@@ -4034,6 +4048,11 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
             targetEnriched,
             worktreeForUpdate,
             'linkedGiteaPR'
+          ),
+          linkedGiteePR: getHostedReviewLinkForMetaRefresh(
+            targetEnriched,
+            worktreeForUpdate,
+            'linkedGiteePR'
           ),
           force: true
         })

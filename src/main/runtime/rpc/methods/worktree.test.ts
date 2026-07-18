@@ -110,6 +110,9 @@ describe('worktree RPC methods', () => {
         linkedPR: 456,
         linkedGitLabIssue: 789,
         linkedGitLabMR: 321,
+        linkedGiteaPR: 654,
+        linkedGiteePR: 987,
+        linkedGiteeIssue: 111,
         sparseCheckout: { directories: ['src'], presetId: 'preset-1' },
         pushTarget: { remoteName: 'fork', branchName: 'feature' },
         parentWorktree: 'id:parent'
@@ -130,7 +133,9 @@ describe('worktree RPC methods', () => {
       linkedGitLabMR: 321,
       linkedBitbucketPR: undefined,
       linkedAzureDevOpsPR: undefined,
-      linkedGiteaPR: undefined,
+      linkedGiteaPR: 654,
+      linkedGiteePR: 987,
+      linkedGiteeIssue: 111,
       comment: undefined,
       displayName: 'Feature title',
       telemetrySource: 'sidebar',
@@ -739,6 +744,31 @@ describe('worktree RPC methods', () => {
         linkedLinearIssue: 'STA-335',
         linkedLinearIssueWorkspaceId: null,
         linkedLinearIssueOrganizationUrlKey: 'stably'
+      })
+    )
+  })
+
+  it('forwards distinct Gitea and Gitee metadata through worktree.set', async () => {
+    const runtime = {
+      getRuntimeId: () => 'test-runtime',
+      updateManagedWorktreeMeta: vi.fn().mockResolvedValue({ id: 'wt-1' })
+    } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: WORKTREE_METHODS })
+
+    const response = await dispatcher.dispatch(
+      makeRequest('worktree.set', {
+        worktree: 'id:wt-1',
+        linkedGiteaPR: null,
+        linkedGiteePR: 55
+      })
+    )
+
+    expect(response).toMatchObject({ ok: true })
+    expect(runtime.updateManagedWorktreeMeta).toHaveBeenCalledWith(
+      'id:wt-1',
+      expect.objectContaining({
+        linkedGiteaPR: null,
+        linkedGiteePR: 55
       })
     )
   })

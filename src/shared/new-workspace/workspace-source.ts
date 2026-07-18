@@ -25,6 +25,11 @@ export type GitLabWorkspaceSource = WorkspaceSourceLinkedItem & {
   type: 'issue' | 'mr'
 }
 
+export type GiteeWorkspaceSource = WorkspaceSourceLinkedItem & {
+  provider: 'gitee'
+  type: 'issue' | 'pr'
+}
+
 export type LinearWorkspaceSource = WorkspaceSourceLinkedItem & {
   provider: 'linear'
   type: 'issue'
@@ -39,6 +44,8 @@ export type WorkspaceSourceSelectionKind =
   | 'github-issue'
   | 'gitlab-mr'
   | 'gitlab-issue'
+  | 'gitee-pr'
+  | 'gitee-issue'
   | 'branch'
   | 'linear'
   | 'jira'
@@ -50,12 +57,45 @@ export type WorkspaceSourceSelection = {
 }
 
 const GITLAB_ISSUE_PATH_RE = /\/-\/(?:issues|work_items)\//i
+const GITEE_HOST_RE = /(^|\.)gitee\.com$/i
+const GITEE_ISSUE_PATH_RE = /\/issues\/[a-z0-9]+/i
+const GITEE_PR_PATH_RE = /\/pulls\/\d+/i
 
 export function isGitLabIssueUrl(url: string): boolean {
   try {
     return GITLAB_ISSUE_PATH_RE.test(new URL(url).pathname)
   } catch {
     return GITLAB_ISSUE_PATH_RE.test(url)
+  }
+}
+
+export function isGiteeHostedUrl(url: string): boolean {
+  try {
+    return GITEE_HOST_RE.test(new URL(url).hostname)
+  } catch {
+    return /gitee\.com/i.test(url)
+  }
+}
+
+export function isGiteeIssueUrl(url: string): boolean {
+  if (!isGiteeHostedUrl(url)) {
+    return false
+  }
+  try {
+    return GITEE_ISSUE_PATH_RE.test(new URL(url).pathname)
+  } catch {
+    return GITEE_ISSUE_PATH_RE.test(url)
+  }
+}
+
+export function isGiteePullUrl(url: string): boolean {
+  if (!isGiteeHostedUrl(url)) {
+    return false
+  }
+  try {
+    return GITEE_PR_PATH_RE.test(new URL(url).pathname)
+  } catch {
+    return GITEE_PR_PATH_RE.test(url)
   }
 }
 
@@ -84,6 +124,9 @@ export function getWorkspaceSourceProvider(item: WorkspaceSourceItemLike): Works
   if (item.type === 'mr' || isGitLabIssueUrl(item.url)) {
     return 'gitlab'
   }
+  if (item.provider === 'gitee' || isGiteeHostedUrl(item.url)) {
+    return 'gitee'
+  }
   if (item.number === 0 && !item.url.includes('github.com')) {
     return 'linear'
   }
@@ -108,6 +151,16 @@ export function buildGitLabWorkspaceSource(item: {
   repoId?: string
 }): GitLabWorkspaceSource {
   return { provider: 'gitlab', ...item }
+}
+
+export function buildGiteeWorkspaceSource(item: {
+  type: 'issue' | 'pr'
+  number: string | number
+  title: string
+  url: string
+  repoId?: string
+}): GiteeWorkspaceSource {
+  return { provider: 'gitee', ...item }
 }
 
 export function getUsableLinearBranchName(
@@ -182,9 +235,13 @@ export function buildWorkspaceSourceSelection(args: {
           ? linkedWorkItem.type === 'mr'
             ? 'gitlab-mr'
             : 'gitlab-issue'
-          : linkedWorkItem.type === 'pr'
-            ? 'github-pr'
-            : 'github-issue'
+          : provider === 'gitee'
+            ? linkedWorkItem.type === 'pr'
+              ? 'gitee-pr'
+              : 'gitee-issue'
+            : linkedWorkItem.type === 'pr'
+              ? 'github-pr'
+              : 'github-issue'
   return {
     kind,
     label:

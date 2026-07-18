@@ -35,6 +35,7 @@ import { callRuntimeRpc, getActiveRuntimeTarget } from '@/runtime/runtime-rpc-cl
 import { resolveWorktreeCreateBaseBranch } from '@/runtime/worktree-create-base'
 import {
   buildTaskSourceContextFromRepo,
+  type GitHubTaskProviderIdentity,
   type TaskSourceContext
 } from '../../../shared/task-source-context'
 import type {
@@ -68,6 +69,8 @@ import {
   getSetupConfig,
   getWorkspaceSeedName,
   isGitLabIssueUrl,
+  isGiteeIssueUrl,
+  isGiteePullUrl,
   PER_REPO_FETCH_LIMIT,
   renderIssueCommandTemplate,
   type LinkedWorkItemSummary,
@@ -490,7 +493,8 @@ function getGitHubLinkedWorkItemIdentity(
   if (
     !item ||
     getLinkedWorkItemProvider(item) !== 'github' ||
-    (item.type !== 'issue' && item.type !== 'pr')
+    (item.type !== 'issue' && item.type !== 'pr') ||
+    typeof item.number !== 'number'
   ) {
     return null
   }
@@ -994,7 +998,7 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
       projectId: selectedWorkspaceTarget.target.projectId,
       repo: selectedRepo,
       projectHostSetupId: selectedWorkspaceTarget.target.projectHostSetupId,
-      providerIdentity: selectedProject.providerIdentity
+      providerIdentity: selectedProject.providerIdentity as GitHubTaskProviderIdentity
     })
   }, [
     initialLinkedWorkItem,
@@ -1025,7 +1029,7 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
         projectHostSetupId: selectedWorkspaceTarget.target.projectHostSetupId,
         providerIdentity:
           selectedProject?.providerIdentity?.provider === 'github'
-            ? selectedProject.providerIdentity
+            ? (selectedProject.providerIdentity as GitHubTaskProviderIdentity)
             : null
       })
     }
@@ -1060,7 +1064,13 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
     if (persistDraft && newWorkspaceDraft?.linkedPR !== undefined) {
       return newWorkspaceDraft.linkedPR
     }
-    return initialLinkedWorkItem?.type === 'pr' ? initialLinkedWorkItem.number : null
+    // Why: only GitHub PRs populate the GitHub linkedPR slot. Gitee/GitLab use
+    // their own fields so create does not mis-write GitHub review metadata.
+    return initialLinkedWorkItem?.type === 'pr' &&
+      getLinkedWorkItemProvider(initialLinkedWorkItem) === 'github' &&
+      typeof initialLinkedWorkItem.number === 'number'
+      ? initialLinkedWorkItem.number
+      : null
   })
   // Why: GitLab parallels of linkedIssue/linkedPR. Kept as separate state
   // (rather than reusing the GitHub slots with a provider discriminator) so
@@ -1070,7 +1080,9 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
     if (persistDraft && newWorkspaceDraft?.linkedGitLabIssue !== undefined) {
       return newWorkspaceDraft.linkedGitLabIssue
     }
-    return initialLinkedWorkItem?.type === 'issue' && isGitLabIssueUrl(initialLinkedWorkItem.url)
+    return initialLinkedWorkItem?.type === 'issue' &&
+      isGitLabIssueUrl(initialLinkedWorkItem.url) &&
+      typeof initialLinkedWorkItem.number === 'number'
       ? initialLinkedWorkItem.number
       : null
   })
@@ -1078,7 +1090,39 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
     if (persistDraft && newWorkspaceDraft?.linkedGitLabMR !== undefined) {
       return newWorkspaceDraft.linkedGitLabMR
     }
-    return initialLinkedWorkItem?.type === 'mr' ? initialLinkedWorkItem.number : null
+    return initialLinkedWorkItem?.type === 'mr' && typeof initialLinkedWorkItem.number === 'number'
+      ? initialLinkedWorkItem.number
+      : null
+  })
+  // Why: Gitee parallels of linkedIssue/linkedPR. Separate slots so GitHub and
+  // GitLab persistence/UI paths keep reading their own fields unchanged.
+  const [linkedGiteeIssue, setLinkedGiteeIssue] = useState<string | number | null>(() => {
+    if (persistDraft && newWorkspaceDraft?.linkedGiteeIssue !== undefined) {
+      return newWorkspaceDraft.linkedGiteeIssue
+    }
+    return initialLinkedWorkItem?.type === 'issue' && isGiteeIssueUrl(initialLinkedWorkItem.url)
+      ? initialLinkedWorkItem.number
+      : null
+  })
+  const [linkedGiteePR, setLinkedGiteePR] = useState<number | null>(() => {
+    if (persistDraft && newWorkspaceDraft?.linkedGiteePR !== undefined) {
+      return newWorkspaceDraft.linkedGiteePR
+    }
+    if (
+      initialLinkedWorkItem?.type === 'pr' &&
+      isGiteePullUrl(initialLinkedWorkItem.url) &&
+      typeof initialLinkedWorkItem.number === 'number'
+    ) {
+      return initialLinkedWorkItem.number
+    }
+    if (
+      initialLinkedWorkItem?.type === 'pr' &&
+      getLinkedWorkItemProvider(initialLinkedWorkItem) === 'gitee' &&
+      typeof initialLinkedWorkItem.number === 'number'
+    ) {
+      return initialLinkedWorkItem.number
+    }
+    return null
   })
   const [baseBranch, setBaseBranch] = useState<string | undefined>(
     persistDraft ? newWorkspaceDraft?.baseBranch : initialBaseBranch
@@ -1653,6 +1697,8 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
       linkedPR,
       linkedGitLabIssue,
       linkedGitLabMR,
+      linkedGiteeIssue,
+      linkedGiteePR,
       ...(baseBranch !== undefined ? { baseBranch } : {}),
       ...(compareBaseRef !== undefined ? { compareBaseRef } : {})
     })
@@ -1666,6 +1712,8 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
     linkedPR,
     linkedGitLabIssue,
     linkedGitLabMR,
+    linkedGiteeIssue,
+    linkedGiteePR,
     linkedWorkItem,
     note,
     name,
@@ -2066,6 +2114,8 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
       }
       setLinkedGitLabIssue(null)
       setLinkedGitLabMR(null)
+      setLinkedGiteeIssue(null)
+      setLinkedGiteePR(null)
       setLinkedWorkItem({
         type: identity.type,
         provider: 'github',
@@ -2249,6 +2299,8 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
       setLinkedPR(resolution.linkedPR)
       setLinkedGitLabIssue(null)
       setLinkedGitLabMR(null)
+      setLinkedGiteeIssue(null)
+      setLinkedGiteePR(null)
       setLinkedWorkItem(resolution.linkedWorkItem)
       setName(resolution.workspaceName)
       lastAutoNameRef.current = resolution.workspaceName
@@ -2296,6 +2348,8 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
       }
       setLinkedIssue('')
       setLinkedPR(null)
+      setLinkedGiteeIssue(null)
+      setLinkedGiteePR(null)
       setLinkedWorkItem({
         type: item.type,
         provider: 'gitlab',
@@ -2675,7 +2729,9 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
         setLinkedPR(null)
         setLinkedGitLabIssue(null)
         setLinkedGitLabMR(null)
-        // Why: repo changes invalidate repo-scoped sources (GitHub/GitLab/branch),
+        setLinkedGiteeIssue(null)
+        setLinkedGiteePR(null)
+        // Why: repo changes invalidate repo-scoped sources (GitHub/GitLab/Gitee/branch),
         // but a selected Linear issue is workspace-scoped source context and
         // must survive choosing the implementation project.
         if (!preserveLinearLinkedWorkItem) {
@@ -2718,12 +2774,16 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
       smartGitHubPrStartPointSelectionRef.current = null
       setLinkedWorkItem((current) => {
         const provider = current ? getLinkedWorkItemProvider(current) : null
-        return provider === 'github' || provider === 'gitlab' ? null : current
+        return provider === 'github' || provider === 'gitlab' || provider === 'gitee'
+          ? null
+          : current
       })
       setLinkedIssue('')
       setLinkedPR(null)
       setLinkedGitLabIssue(null)
       setLinkedGitLabMR(null)
+      setLinkedGiteeIssue(null)
+      setLinkedGiteePR(null)
     },
     [folderSourceRepos, setRepoId]
   )
@@ -2765,6 +2825,8 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
         setLinkedPR(null)
         setLinkedGitLabIssue(null)
         setLinkedGitLabMR(null)
+        setLinkedGiteeIssue(null)
+        setLinkedGiteePR(null)
         const linkedProvider = linkedWorkItem ? getLinkedWorkItemProvider(linkedWorkItem) : null
         if (linkedWorkItem && linkedProvider !== 'linear' && linkedProvider !== 'jira') {
           setLinkedWorkItem(null)
@@ -2938,6 +3000,8 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
         setLinkedPR(identity.type === 'pr' ? identity.number : null)
         setLinkedGitLabIssue(null)
         setLinkedGitLabMR(null)
+        setLinkedGiteeIssue(null)
+        setLinkedGiteePR(null)
         setLinkedWorkItem(linkedItem)
         const nextName = getLinkedItemDisplayName(linkedItem)
         if (
@@ -3046,6 +3110,8 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
         setLinkedGitLabMR(item.type === 'mr' ? item.number : null)
         setLinkedIssue('')
         setLinkedPR(null)
+        setLinkedGiteeIssue(null)
+        setLinkedGiteePR(null)
         setLinkedWorkItem(linkedItem)
         const nextName = getLinkedItemDisplayName(linkedItem)
         if (
@@ -3216,6 +3282,8 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
         setLinkedPR(null)
         setLinkedGitLabIssue(null)
         setLinkedGitLabMR(null)
+        setLinkedGiteeIssue(null)
+        setLinkedGiteePR(null)
         setLinkedWorkItem(linkedItem)
         const suggestedName =
           getLinkedItemDisplayName(linkedItem) ?? getLinearIssueWorkspaceName(issue)
@@ -3235,6 +3303,8 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
       setLinkedPR(null)
       setLinkedGitLabIssue(null)
       setLinkedGitLabMR(null)
+      setLinkedGiteeIssue(null)
+      setLinkedGiteePR(null)
       const linkedLinearIssue = buildLinearIssueLinkedWorkItem(issue)
       setLinkedWorkItem(linkedLinearIssue)
       const suggestedName = getLinearIssueWorkspaceName(issue)
@@ -3268,6 +3338,8 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
     setLinkedPR(null)
     setLinkedGitLabIssue(null)
     setLinkedGitLabMR(null)
+    setLinkedGiteeIssue(null)
+    setLinkedGiteePR(null)
     setLinkedWorkItem(null)
     setBaseBranch(undefined)
     setCompareBaseRef(undefined)
@@ -3687,7 +3759,10 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
         undefined,
         undefined,
         undefined,
-        submitCompareBaseRef
+        submitCompareBaseRef,
+        undefined,
+        smartGitHubResolution.kind === 'none' ? (linkedGiteePR ?? undefined) : undefined,
+        smartGitHubResolution.kind === 'none' ? (linkedGiteeIssue ?? undefined) : undefined
       )
       const worktree = result.worktree
 
@@ -3845,6 +3920,8 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
     setLinkedPR(null)
     setLinkedGitLabIssue(null)
     setLinkedGitLabMR(null)
+    setLinkedGiteeIssue(null)
+    setLinkedGiteePR(null)
     setBranchNameOverride(undefined)
     setBranchNameOverridePreservesNameEdits(false)
     setCompareBaseRef(undefined)
@@ -4202,6 +4279,12 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
           ...(smartGitHubResolution.kind === 'none' && linkedGitLabIssue != null
             ? { linkedGitLabIssue }
             : {}),
+          ...(smartGitHubResolution.kind === 'none' && linkedGiteePR != null
+            ? { linkedGiteePR }
+            : {}),
+          ...(smartGitHubResolution.kind === 'none' && linkedGiteeIssue != null
+            ? { linkedGiteeIssue }
+            : {}),
           ...(backendStartup ? { startup: backendStartup } : {}),
           pendingFirstAgentMessageRename,
           note: trimmedNote,
@@ -4243,6 +4326,8 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
       effectiveLinkedPR,
       linkedGitLabIssue,
       linkedGitLabMR,
+      linkedGiteeIssue,
+      linkedGiteePR,
       linkedPR,
       linkedWorkItem,
       name,
@@ -4388,7 +4473,11 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
     onBaseBranchPrSelect: isProjectGroupTarget ? () => {} : handleBaseBranchPrSelect,
     onBaseBranchMrSelect: isProjectGroupTarget ? () => {} : handleBaseBranchMrSelect,
     baseBranchLinkedPrNumber:
-      linkedWorkItem?.type === 'pr' && baseBranch ? linkedWorkItem.number : null,
+      linkedWorkItem?.type === 'pr' &&
+      baseBranch &&
+      typeof linkedWorkItem.number === 'number'
+        ? linkedWorkItem.number
+        : null,
     selectedRepoPath: isProjectGroupTarget ? null : (selectedRepo?.path ?? null),
     selectedRepoIsRemote: isProjectGroupTarget
       ? folderTargetIsRemote

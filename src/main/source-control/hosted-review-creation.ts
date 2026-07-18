@@ -9,8 +9,10 @@ import type {
   HostedReviewProvider
 } from '../../shared/hosted-review'
 import {
+  hostedReviewBranchNamesMatch,
   normalizeHostedReviewBaseRef,
-  normalizeHostedReviewHeadRef
+  normalizeHostedReviewHeadRef,
+  resolveHostedReviewApiHeadRef
 } from '../../shared/hosted-review-refs'
 import {
   supportsHostedReviewCreation,
@@ -18,6 +20,7 @@ import {
 } from '../../shared/hosted-review-creation-providers'
 import { isAzureDevOpsReviewCreationAuthenticated } from '../azure-devops/pull-request-creation'
 import { isGiteaReviewCreationAuthenticated } from '../gitea/pull-request-creation'
+import { isGiteeReviewCreationAuthenticated } from '../gitee/pull-request-creation'
 import { getEnterpriseGitHubRepoSlug } from '../github/github-enterprise-repository'
 import { acquire, ghExecFileAsync, gitExecFileAsync, release } from '../github/gh-utils'
 import { isNoUpstreamError, normalizeGitErrorMessage } from '../../shared/git-remote-error'
@@ -277,6 +280,14 @@ function reviewCopy(provider: HostedReviewProvider): {
       authInstruction: 'Set ORCA_GITEA_TOKEN'
     }
   }
+  if (provider === 'gitee') {
+    return {
+      shortLabel: 'PR',
+      reviewLabel: 'pull request',
+      providerName: 'Gitee',
+      authInstruction: 'Set ORCA_GITEE_TOKEN'
+    }
+  }
   return {
     shortLabel: 'PR',
     reviewLabel: 'pull request',
@@ -299,6 +310,9 @@ async function isProviderAuthenticated(
   }
   if (provider === 'gitea') {
     return isGiteaReviewCreationAuthenticated()
+  }
+  if (provider === 'gitee') {
+    return isGiteeReviewCreationAuthenticated()
   }
   return isGitHubAuthenticated(repoPath, connectionId, options)
 }
@@ -398,6 +412,34 @@ function blockedEligibilityToCreateResult(
   }
 }
 
+async function getUpstreamBranchName(
+  repoPath: string,
+  connectionId?: string | null,
+  options: HostedReviewExecutionOptions = {}
+): Promise<string | null> {
+  try {
+    // Prefer structured upstream status (local + SSH) when it already carries a
+    // tracking name so we do not spawn an extra rev-parse.
+    const status = await getHostedReviewUpstreamStatus(repoPath, connectionId, options)
+    if (status.upstreamName?.trim()) {
+      return status.upstreamName.trim()
+    }
+    if (connectionId) {
+      return null
+    }
+    const { stdout } = await runGitForHostedReview(
+      repoPath,
+      ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}'],
+      connectionId,
+      options
+    )
+    const upstream = stdout.trim()
+    return upstream.length > 0 ? upstream : null
+  } catch {
+    return null
+  }
+}
+
 async function validateCurrentBranchCanCreateReview(
   repoPath: string,
   connectionId: string | null | undefined,
@@ -407,7 +449,9 @@ async function validateCurrentBranchCanCreateReview(
   const requestedHead = input.head ? stripRefPrefix(input.head).trim() : ''
   const currentBranch = await getCurrentBranch(repoPath, connectionId, options)
   const copy = reviewCopy(input.provider)
-  if (requestedHead && requestedHead !== currentBranch) {
+  // Why: local branch may be named origin/feature by other tools while the UI
+  // and forge head use feature — accept either identity for checkout matching.
+  if (requestedHead && !hostedReviewBranchNamesMatch(requestedHead, currentBranch)) {
     return {
       ok: false,
       code: 'validation',
@@ -452,6 +496,11 @@ export async function getHostedReviewCreationEligibility(
   args: HostedReviewCreationEligibilityInput
 ): Promise<HostedReviewCreationEligibility> {
   const branch = stripRefPrefix(args.branch).trim()
+  // Why: an empty ref or the literal `HEAD` is a detached checkout — branch
+  // lookup can't apply, so we never re-throw a flaky review lookup here and the
+  // resolved head is null (a provider-linked id can still surface an existing
+  // review below).
+  const isDetached = !branch || branch === 'HEAD'
   const provider = await detectHostedReviewProvider({
     repoPath: args.repoPath,
     connectionId: args.connectionId,
@@ -485,17 +534,20 @@ export async function getHostedReviewCreationEligibility(
       linkedBitbucketPR: args.linkedBitbucketPR ?? null,
       linkedAzureDevOpsPR: args.linkedAzureDevOpsPR ?? null,
       linkedGiteaPR: args.linkedGiteaPR ?? null,
+      linkedGiteePR: args.linkedGiteePR ?? null,
       connectionId: args.connectionId ?? null,
       ...hostedReviewExecutionContext(args)
     })
   } catch (error) {
+    // Why: on detached HEAD the lookup only ever runs to surface a linked review
+    // for "open existing"; a flaky lookup must degrade to the stable
+    // detached_head blocker below rather than re-throw a generic preflight error.
     const canReturnLocalBlocker =
-      branch &&
-      branch !== 'HEAD' &&
+      !isDetached &&
       supportsHostedReviewCreation(provider) &&
       (!baseBranch || branch.toLowerCase() !== baseBranch.toLowerCase()) &&
       (args.hasUncommittedChanges || args.hasUpstream !== true || (args.behind ?? 0) > 0)
-    if (!canReturnLocalBlocker) {
+    if (!isDetached && !canReturnLocalBlocker) {
       throw error
     }
     // Why: local blockers still let the UI offer Create PR preparation; a
@@ -510,8 +562,10 @@ export async function getHostedReviewCreationEligibility(
     head: branch || null
   }
 
-  if (!branch || branch === 'HEAD') {
-    return { ...baseResult, canCreate: false, blockedReason: 'detached_head', nextAction: null }
+  if (isDetached) {
+    // Why: a detached checkout has no branch head to create from; null the head
+    // so downstream UI never treats the literal `HEAD` as a real branch name.
+    return { ...baseResult, head: null, canCreate: false, blockedReason: 'detached_head', nextAction: null }
   }
   if (review) {
     return {
@@ -608,8 +662,21 @@ export async function createHostedReview(
   if (blocked) {
     return blocked
   }
+  // Why: forge APIs want the remote-facing branch name. Local checkouts named
+  // origin/feature (common from other tools) must resolve via upstream or
+  // identity normalization before create.
+  const currentBranch = await getCurrentBranch(repoPath, connectionId, options)
+  const upstreamName = await getUpstreamBranchName(repoPath, connectionId, options)
+  const resolvedHead = resolveHostedReviewApiHeadRef(
+    input.head?.trim() || currentBranch,
+    upstreamName
+  )
+  const createInput: CreateHostedReviewInput = {
+    ...input,
+    head: resolvedHead || input.head
+  }
   const localGitOptions = getHostedReviewLocalGitOptions(options)
   return Object.keys(localGitOptions).length > 0
-    ? provider.createReview(repoPath, input, connectionId, options)
-    : provider.createReview(repoPath, input, connectionId)
+    ? provider.createReview(repoPath, createInput, connectionId, options)
+    : provider.createReview(repoPath, createInput, connectionId)
 }

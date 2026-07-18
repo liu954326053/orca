@@ -100,7 +100,7 @@ export type { ForkSyncMode, GitForkSyncExpectedUpstream, GitForkSyncResult } fro
 export type ExternalWorktreeVisibility = 'hide' | 'show'
 
 export type ProjectProviderIdentity = {
-  provider: 'github'
+  provider: 'github' | 'gitee'
   owner: string
   repo: string
 }
@@ -337,9 +337,11 @@ export type FolderWorkspace = {
 }
 
 export type FolderWorkspaceLinkedTask = {
-  provider: 'github' | 'gitlab' | 'linear' | 'jira'
+  provider: 'github' | 'gitlab' | 'linear' | 'jira' | 'gitee'
   type: 'issue' | 'pr' | 'mr'
-  number: number
+  // Why: Gitee issue numbers are public alphanumeric ids while every existing
+  // provider keeps using numeric values.
+  number: string | number
   title: string
   url: string
   linearIdentifier?: string
@@ -490,6 +492,9 @@ export type Worktree = {
   linkedBitbucketPR?: number | null
   linkedAzureDevOpsPR?: number | null
   linkedGiteaPR?: number | null
+  linkedGiteePR?: number | null
+  /** Gitee issue number. Parallel to linkedIssue / linkedGitLabIssue. */
+  linkedGiteeIssue?: string | number | null
   isArchived: boolean
   isUnread: boolean
   isPinned: boolean
@@ -599,6 +604,10 @@ export type WorktreeMeta = {
   linkedAzureDevOpsPR?: number | null
   /** Optional for backward compatibility — see Worktree.linkedGiteaPR. */
   linkedGiteaPR?: number | null
+  /** Optional for backward compatibility — see Worktree.linkedGiteePR. */
+  linkedGiteePR?: number | null
+  /** Optional for backward compatibility — see Worktree.linkedGiteeIssue. */
+  linkedGiteeIssue?: string | number | null
   isArchived: boolean
   isUnread: boolean
   isPinned: boolean
@@ -2142,6 +2151,8 @@ export type CreateWorktreeArgs = {
   linkedBitbucketPR?: number | null
   linkedAzureDevOpsPR?: number | null
   linkedGiteaPR?: number | null
+  linkedGiteePR?: number | null
+  linkedGiteeIssue?: string | number | null
   pushTarget?: GitPushTarget
   workspaceStatus?: WorkspaceStatus
   manualOrder?: number

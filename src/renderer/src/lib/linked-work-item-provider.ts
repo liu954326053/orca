@@ -1,4 +1,7 @@
 export {
   getWorkspaceSourceProvider as getLinkedWorkItemProvider,
-  isGitLabIssueUrl
+  isGitLabIssueUrl,
+  isGiteeIssueUrl,
+  isGiteePullUrl,
+  isGiteeHostedUrl
 } from '../../../shared/new-workspace/workspace-source'

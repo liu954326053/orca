@@ -59,6 +59,40 @@ describe('task source context', () => {
     ).toBe(toRuntimeExecutionHostId('remote-runtime'))
   })
 
+  it('keeps Gitee repository identity on the repo execution host', () => {
+    expect(
+      buildTaskSourceContextFromRepo({
+        provider: 'gitee',
+        projectId: 'project-1',
+        repo: {
+          id: 'repo-1',
+          connectionId: 'ssh target',
+          executionHostId: null
+        },
+        providerIdentity: {
+          provider: 'gitee',
+          host: 'gitee.com',
+          owner: 'stablyai',
+          repo: 'orca'
+        }
+      })
+    ).toEqual({
+      kind: 'task-source',
+      provider: 'gitee',
+      projectId: 'project-1',
+      hostId: toSshExecutionHostId('ssh target'),
+      projectHostSetupId: null,
+      repoId: 'repo-1',
+      providerIdentity: {
+        provider: 'gitee',
+        host: 'gitee.com',
+        owner: 'stablyai',
+        repo: 'orca'
+      },
+      accountLabel: null
+    })
+  })
+
   it('derives runtime settings only for runtime-owned task sources', () => {
     expect(
       getTaskSourceRuntimeSettings({
@@ -100,7 +134,7 @@ describe('task source context', () => {
     expect(local).not.toBe(differentRepo)
   })
 
-  it('serializes provider identities for GitLab, Linear, and Jira cache scopes', () => {
+  it('serializes provider identities for GitLab, Gitee, Linear, and Jira cache scopes', () => {
     const base = {
       projectId: 'project-1',
       hostId: LOCAL_EXECUTION_HOST_ID,
@@ -114,6 +148,18 @@ describe('task source context', () => {
         providerIdentity: { provider: 'gitlab', namespace: 'stably', project: 'orca' }
       })
     ).toContain(encodeURIComponent('stably/orca'))
+    expect(
+      getTaskSourceCacheScope({
+        ...base,
+        provider: 'gitee',
+        providerIdentity: {
+          provider: 'gitee',
+          host: 'gitee.com',
+          owner: 'stablyai',
+          repo: 'orca'
+        }
+      })
+    ).toContain(encodeURIComponent('gitee.com/stablyai/orca'))
     expect(
       getTaskSourceCacheScope({
         ...base,

@@ -28,6 +28,7 @@ export type SourceControlManualReviewContext = ManualReviewUrlInput & {
   linkedBitbucketPR?: number | null
   linkedAzureDevOpsPR?: number | null
   linkedGiteaPR?: number | null
+  linkedGiteePR?: number | null
 }
 
 export function resolveSourceControlManualReviewProvider(input: {
@@ -39,6 +40,7 @@ export function resolveSourceControlManualReviewProvider(input: {
   linkedBitbucketPR?: number | null
   linkedAzureDevOpsPR?: number | null
   linkedGiteaPR?: number | null
+  linkedGiteePR?: number | null
 }): HostedReviewProvider | null {
   return (
     input.hostedReviewProvider ??
@@ -51,9 +53,11 @@ export function resolveSourceControlManualReviewProvider(input: {
           ? 'azure-devops'
           : input.linkedGiteaPR != null
             ? 'gitea'
-            : input.linkedGitHubPR != null || input.fallbackGitHubPRNumber != null
-              ? 'github'
-              : null)
+            : input.linkedGiteePR != null
+              ? 'gitee'
+              : input.linkedGitHubPR != null || input.fallbackGitHubPRNumber != null
+                ? 'github'
+                : null)
   )
 }
 
@@ -69,6 +73,7 @@ export function buildSourceControlManualReviewUrlFromContext(
     linkedBitbucketPR,
     linkedAzureDevOpsPR,
     linkedGiteaPR,
+    linkedGiteePR,
     ...urlInput
   } = input
   return buildSourceControlManualReviewUrl({
@@ -81,7 +86,8 @@ export function buildSourceControlManualReviewUrlFromContext(
       linkedGitLabMR,
       linkedBitbucketPR,
       linkedAzureDevOpsPR,
-      linkedGiteaPR
+      linkedGiteaPR,
+      linkedGiteePR
     })
   })
 }
@@ -99,7 +105,7 @@ function appendQuery(url: string, values: Record<string, string>): string {
   return `${url}?${search.toString()}`
 }
 
-// GitHub/Gitea compare refs keep '/' (slashed branch names like feature/foo) and
+// GitHub/Gitea/Gitee compare refs keep '/' (slashed branch names like feature/foo) and
 // ':' (the owner:branch fork qualifier) literal; percent-encoding those separators
 // makes GitHub fail to resolve the branch. Only the segments between them are encoded.
 function encodeCompareRef(ref: string): string {
@@ -184,6 +190,7 @@ export function buildSourceControlManualReviewUrl(input: ManualReviewUrlInput): 
         targetRef: `refs/heads/${baseBranch}`
       })
     case 'gitea':
+    case 'gitee':
       return `${baseRepo.webBaseUrl}/compare/${encodeCompareRef(baseBranch)}...${encodeCompareRef(headBranch)}`
   }
 }

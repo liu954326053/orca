@@ -1758,7 +1758,47 @@
         "jiraSortAscending": "오름차순",
         "jiraSortDescending": "내림차순",
         "jiraSortBy": "정렬 기준",
-        "jiraToggleSortDirection": "{{value0}}으로 정렬"
+        "jiraToggleSortDirection": "{{value0}}으로 정렬",
+        "giteeResumeWorkspace": "Resume workspace attached to Gitee {{value0}} #{{value1}}",
+        "giteeStartWorkspace": "Start workspace from Gitee {{value0}} #{{value1}}",
+        "giteeIssues": "Issues",
+        "giteePrs": "PRs",
+        "giteeOpen": "Open",
+        "giteeClosed": "Closed",
+        "giteeAll": "All",
+        "giteeView": "Gitee view",
+        "giteeState": "Gitee state",
+        "giteeRefresh": "Refresh Gitee work items",
+        "giteeMerged": "Merged",
+        "giteeDraft": "Draft",
+        "giteeUnknownAuthor": "Unknown author",
+        "giteeOpenItem": "Open Gitee {{value0}} #{{value1}}",
+        "giteeIssuesLower": "issues",
+        "giteePullRequestsLower": "pull requests",
+        "giteeLoading": "Loading Gitee {{value0}}",
+        "giteeEmpty": "No Gitee {{value0}}",
+        "giteeSelectProject": "Select at least one project source.",
+        "giteeChangeFilter": "No items match the selected state.",
+        "gitee_label": "Gitee",
+        "giteeProgressing": "Progressing",
+        "giteeRejected": "Rejected",
+        "giteeCreateIssue": "New issue",
+        "giteeSearchPlaceholder": "Search issues",
+        "giteeSearchLabel": "Search Gitee work items",
+        "giteeIssueTitlePlaceholder": "Title",
+        "giteeIssueBodyPlaceholder": "Description (optional)",
+        "giteeCreateIssueSubmit": "Create",
+        "giteeCreateIssueCancel": "Cancel",
+        "giteeCreateIssueSelectProject": "Select a project before creating an issue.",
+        "giteeCreateIssueFailed": "Failed to create issue.",
+        "giteeCreateIssueTitle": "New issue",
+        "giteeCreateIssueFilingIn": "Filing in {{value0}}",
+        "giteeCreateIssueDescription": "Add a title and optional description. The list refreshes after creation.",
+        "giteeCreateIssueTitleLabel": "Title",
+        "giteeCreateIssueTitlePlaceholder": "Short summary",
+        "giteeCreateIssueBodyLabel": "Description (optional)",
+        "giteeCreateIssueBodyPlaceholder": "Details (Markdown supported)",
+        "giteeCreateIssueCreating": "Creating..."
       },
       "Terminal": {
         "73768427cf": "닫기",
@@ -3993,7 +4033,8 @@
           "196c1b5362": "GitLab 작업 열기",
           "0ccba862b8": "GitHub 작업 열기",
           "fee535205b": "작업",
-          "d599269755": "사이드바에서 숨기기"
+          "d599269755": "사이드바에서 숨기기",
+          "gitee_open": "Open Gitee tasks"
         },
         "SidebarRepositoryFilterSection": {
           "d3a9c4cea1": "지우기",
@@ -6682,7 +6723,9 @@
           "dd67a1b6e1": "작업 소스 선택기 및 사이드바 바로가기에 GitLab을 표시합니다.",
           "7c5d7fdc20": "GitLab",
           "1db47236cd": "작업 소스 선택기 및 사이드바 바로가기에 GitHub를 표시합니다.",
-          "e14063e727": "GitHub"
+          "e14063e727": "GitHub",
+          "gitee_label": "Gitee",
+          "gitee_description": "Show Gitee in the Tasks source picker and sidebar shortcuts."
         },
         "TerminalAppearanceSection": {
           "a14a427ae4": "창 구분선의 두께입니다.",
@@ -10267,6 +10310,33 @@
             "workspaceGone": "Couldn't open log — workspace is no longer available.",
             "notAuthorized": "Couldn't open log — path not authorized.",
             "alreadyEditable": "Log is already open for editing."
+          },
+          "createReviewBlocked": {
+            "dirty": "Create {{shortLabel}} failed: commit or discard local changes before creating a {{reviewLabel}}.",
+            "defaultBranch": "Create {{shortLabel}} failed: choose a feature branch before creating a {{reviewLabel}}.",
+            "noUpstream": "Create {{shortLabel}} failed: publish this branch before creating a {{reviewLabel}}.",
+            "needsPush": "Create {{shortLabel}} failed: push this branch before creating a {{reviewLabel}}.",
+            "needsSync": "Create {{shortLabel}} failed: sync this branch before creating a {{reviewLabel}}.",
+            "authRequired": "Create {{shortLabel}} failed: {{providerName}} is not authenticated. Next step: {{authInstruction}} in this environment.",
+            "authGitlab": "Run glab auth login",
+            "authAzureDevOps": "Set ORCA_AZURE_DEVOPS_TOKEN",
+            "authGitea": "Set ORCA_GITEA_TOKEN",
+            "authGitee": "Set ORCA_GITEE_TOKEN",
+            "authGitHub": "Run gh auth login"
+          },
+          "createReviewError": {
+            "switchBackToBranch": "Create {{shortLabel}} failed: switch back to the selected branch before creating a pull request.",
+            "dirty": "Create {{shortLabel}} failed: commit or discard local changes before creating a pull request.",
+            "defaultBranch": "Create {{shortLabel}} failed: choose a feature branch before creating a pull request.",
+            "noUpstream": "Create {{shortLabel}} failed: publish this branch before creating a pull request.",
+            "needsPush": "Create {{shortLabel}} failed: push this branch before creating a pull request.",
+            "needsSync": "Create {{shortLabel}} failed: sync this branch before creating a pull request.",
+            "detachedHead": "Create {{shortLabel}} failed: switch to a branch before creating a pull request.",
+            "refreshAndRetry": "Create {{shortLabel}} failed: refresh source control status and try again.",
+            "baseNotOnRemote": "Create {{shortLabel}} failed: the selected base branch has not been pushed to the remote. Choose a pushed base or push it first.",
+            "alreadyExists": "A pull request already exists for this branch.",
+            "notAuthenticated": "Create {{shortLabel}} failed: {{detail}}",
+            "genericWithDetail": "Create {{shortLabel}} failed: {{detail}}"
           }
         }
       },
@@ -12911,7 +12981,9 @@
       "taskSourceContextSummary": {
         "sourceUnavailable": "{{value0}} 소스를 사용할 수 없음: {{value1}}",
         "someSourceHostsUnavailable": "일부 {{value0}} 소스 호스트를 사용할 수 없음: {{value1}}",
-        "reconnectOrUpdateTitle": "이 소스를 불러오려면 {{value0}}을(를) 다시 연결하거나 업데이트하세요."
+        "reconnectOrUpdateTitle": "이 소스를 불러오려면 {{value0}}을(를) 다시 연결하거나 업데이트하세요.",
+        "setGiteeToken": "{{value0}}. Set ORCA_GITEE_TOKEN.",
+        "setGiteeTokenTitle": "Set ORCA_GITEE_TOKEN in the source environment, then reload Gitee."
       },
       "ShortcutKeyCombo": {
         "07eb4985a1": "{{value0}} 두 번 누르기"

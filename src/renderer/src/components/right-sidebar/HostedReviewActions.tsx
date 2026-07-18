@@ -27,21 +27,35 @@ import {
   RIGHT_SIDEBAR_PRIMARY_BUTTON_LABEL_CLASS,
   RIGHT_SIDEBAR_SPLIT_ACTION_ROW_CLASS
 } from './right-sidebar-primary-action-layout'
+import { isHostedReviewMutationProvider } from './hosted-review-mutation-provider'
 import { translate } from '@/i18n/i18n'
 
-export default function HostedReviewActions({
-  review,
-  githubPR,
-  repo,
-  worktree,
-  onRefreshReview
-}: {
+type HostedReviewActionsProps = {
   review: HostedReviewActionInfo
   githubPR?: PRInfo | null
   repo: Repo
   worktree: Worktree
   onRefreshReview: () => Promise<void>
-}): React.JSX.Element | null {
+}
+
+export default function HostedReviewActions(
+  props: HostedReviewActionsProps
+): React.JSX.Element | null {
+  // Why: mutation transports only exist for GitHub and GitLab; other hosted
+  // review providers must remain read-only instead of falling through to GitHub.
+  if (!isHostedReviewMutationProvider(props.review.provider)) {
+    return null
+  }
+  return <MutableHostedReviewActions {...props} />
+}
+
+function MutableHostedReviewActions({
+  review,
+  githubPR,
+  repo,
+  worktree,
+  onRefreshReview
+}: HostedReviewActionsProps): React.JSX.Element | null {
   const isDeletingWorktree = useAppStore(
     (s) => s.deleteStateByWorktreeId[worktree.id]?.isDeleting ?? false
   )

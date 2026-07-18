@@ -93,6 +93,7 @@ function getEphemeralVmPortableBaseSelection(
     request.linkedBitbucketPR !== undefined ||
     request.linkedAzureDevOpsPR !== undefined ||
     request.linkedGiteaPR !== undefined ||
+    request.linkedGiteePR !== undefined ||
     Boolean(request.compareBaseRef) ||
     Boolean(request.pushTarget) ||
     Boolean(request.branchNameOverride)

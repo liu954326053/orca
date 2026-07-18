@@ -39,6 +39,8 @@ export function buildWorktreeSetHostedReviewLinkParams(
       return { ...base, linkedAzureDevOpsPR: number }
     case 'gitea':
       return { ...base, linkedGiteaPR: number }
+    case 'gitee':
+      return { ...base, linkedGiteePR: number }
     case 'unsupported':
       return base
   }

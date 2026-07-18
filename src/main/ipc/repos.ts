@@ -764,9 +764,9 @@ const ProjectHostSetupDeleteIpcArgs = z.object({
 
 const FolderWorkspaceLinkedTaskArgs = z
   .object({
-    provider: z.enum(['github', 'gitlab', 'linear', 'jira']),
+    provider: z.enum(['github', 'gitlab', 'linear', 'jira', 'gitee']),
     type: z.enum(['issue', 'pr', 'mr']),
-    number: z.number().finite(),
+    number: z.union([z.number().finite(), z.string().trim().min(1)]),
     title: z.string().min(1),
     url: z.string().min(1),
     linearIdentifier: z.string().min(1).optional(),

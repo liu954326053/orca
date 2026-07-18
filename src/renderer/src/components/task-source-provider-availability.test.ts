@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import type { PreflightStatus } from '../../../preload/api-types'
 import type { TaskSourceContext } from '../../../shared/task-source-context'
-import { getRepoBackedProviderAvailability } from './task-source-provider-availability'
+import {
+  getGiteeProviderAvailability,
+  getGiteeTaskSourceAvailabilityNotice,
+  getRepoBackedProviderAvailability
+} from './task-source-provider-availability'
 
 const readyPreflight: PreflightStatus = {
   git: { installed: true },
@@ -152,6 +156,117 @@ describe('task source provider availability', () => {
         preflightStatus: {
           ...readyPreflight,
           gh: { installed: false, authenticated: false }
+        }
+      })
+    ).toEqual([])
+  })
+})
+
+describe('Gitee provider availability', () => {
+  function giteeSource(hostId: TaskSourceContext['hostId']): TaskSourceContext {
+    return {
+      kind: 'task-source',
+      provider: 'gitee',
+      projectId: 'gitee:owner/repo',
+      hostId,
+      repoId: `repo-${hostId}`
+    }
+  }
+
+  it('marks a source unavailable when ORCA_GITEE_TOKEN is not configured', () => {
+    expect(
+      getGiteeProviderAvailability({
+        contexts: [giteeSource('local')],
+        preflightReady: true,
+        preflightStatus: {
+          ...readyPreflight,
+          gitee: {
+            configured: false,
+            authenticated: false,
+            account: null,
+            baseUrl: null,
+            tokenConfigured: false
+          }
+        }
+      })
+    ).toEqual([{ hostId: 'local', reason: 'missing-provider-auth' }])
+  })
+
+  it('reports no unavailability when the token is configured', () => {
+    expect(
+      getGiteeProviderAvailability({
+        contexts: [giteeSource('local')],
+        preflightReady: true,
+        preflightStatus: {
+          ...readyPreflight,
+          gitee: {
+            configured: true,
+            authenticated: true,
+            account: 'alice',
+            baseUrl: 'https://gitee.com/api/v5',
+            tokenConfigured: true
+          }
+        }
+      })
+    ).toEqual([])
+  })
+
+  it('marks a source unavailable when the configured token fails authentication', () => {
+    expect(
+      getGiteeProviderAvailability({
+        contexts: [giteeSource('local')],
+        preflightReady: true,
+        preflightStatus: {
+          ...readyPreflight,
+          gitee: {
+            configured: true,
+            authenticated: false,
+            account: null,
+            baseUrl: 'https://gitee.com/api/v5',
+            tokenConfigured: true
+          }
+        }
+      })
+    ).toEqual([{ hostId: 'local', reason: 'missing-provider-auth' }])
+  })
+
+  it('names the token required to restore an authenticated source', () => {
+    expect(
+      getGiteeTaskSourceAvailabilityNotice({
+        providerLabel: 'Gitee',
+        hostAvailability: [{ hostId: 'local', reason: 'missing-provider-auth' }]
+      })
+    ).toEqual({
+      label: 'Gitee source unavailable: Local Mac provider auth needed. Set ORCA_GITEE_TOKEN.',
+      title: 'Set ORCA_GITEE_TOKEN in the source environment, then reload Gitee.',
+      blocking: true
+    })
+  })
+
+  it('marks unavailable when preflight payload predates Gitee support', () => {
+    expect(
+      getGiteeProviderAvailability({
+        contexts: [giteeSource('local')],
+        preflightReady: true,
+        preflightStatus: readyPreflight
+      })
+    ).toEqual([{ hostId: 'local', reason: 'missing-provider-auth' }])
+  })
+
+  it('waits for preflight before reporting Gitee availability', () => {
+    expect(
+      getGiteeProviderAvailability({
+        contexts: [giteeSource('local')],
+        preflightReady: false,
+        preflightStatus: {
+          ...readyPreflight,
+          gitee: {
+            configured: false,
+            authenticated: false,
+            account: null,
+            baseUrl: null,
+            tokenConfigured: false
+          }
         }
       })
     ).toEqual([])

@@ -97,7 +97,31 @@ describe('hosted review slice', () => {
       linkedGitLabMR: 5,
       linkedBitbucketPR: null,
       linkedAzureDevOpsPR: null,
-      linkedGiteaPR: null
+      linkedGiteaPR: null,
+      linkedGiteePR: null
+    })
+  })
+
+  it('forwards linked Gitee PR hints through the common IPC surface', async () => {
+    mockApi.hostedReview.forBranch.mockResolvedValueOnce(null)
+    const store = makeStore()
+
+    await expect(
+      store.getState().fetchHostedReviewForBranch('/repo', 'feature/gitee', {
+        linkedGiteePR: 37
+      })
+    ).resolves.toBeNull()
+
+    expect(mockApi.hostedReview.forBranch).toHaveBeenCalledWith({
+      repoPath: '/repo',
+      branch: 'feature/gitee',
+      currentHeadOid: null,
+      linkedGitHubPR: null,
+      linkedGitLabMR: null,
+      linkedBitbucketPR: null,
+      linkedAzureDevOpsPR: null,
+      linkedGiteaPR: null,
+      linkedGiteePR: 37
     })
   })
 
@@ -211,7 +235,8 @@ describe('hosted review slice', () => {
         linkedGitLabMR: null,
         linkedBitbucketPR: null,
         linkedAzureDevOpsPR: null,
-        linkedGiteaPR: null
+        linkedGiteaPR: null,
+        linkedGiteePR: null
       },
       { timeoutMs: 30_000 }
     )
@@ -457,7 +482,8 @@ describe('hosted review slice', () => {
       linkedGitLabMR: 33,
       linkedBitbucketPR: null,
       linkedAzureDevOpsPR: null,
-      linkedGiteaPR: null
+      linkedGiteaPR: null,
+      linkedGiteePR: null
     })
   })
 

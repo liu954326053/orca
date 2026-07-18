@@ -9,16 +9,32 @@ export function folderWorkspaceToWorktree(folderWorkspace: FolderWorkspace): Wor
     displayName: folderWorkspace.name,
     comment: folderWorkspace.comment,
     linkedIssue:
-      linkedTask?.provider === 'github' && linkedTask.type === 'issue' ? linkedTask.number : null,
+      linkedTask?.provider === 'github' &&
+      linkedTask.type === 'issue' &&
+      typeof linkedTask.number === 'number'
+        ? linkedTask.number
+        : null,
     linkedPR: null,
     linkedLinearIssue:
       linkedTask?.provider === 'linear' ? (linkedTask.linearIdentifier ?? null) : null,
     linkedGitLabMR: null,
     linkedGitLabIssue:
-      linkedTask?.provider === 'gitlab' && linkedTask.type === 'issue' ? linkedTask.number : null,
+      linkedTask?.provider === 'gitlab' &&
+      linkedTask.type === 'issue' &&
+      typeof linkedTask.number === 'number'
+        ? linkedTask.number
+        : null,
     linkedBitbucketPR: null,
     linkedAzureDevOpsPR: null,
     linkedGiteaPR: null,
+    linkedGiteePR:
+      linkedTask?.provider === 'gitee' &&
+      linkedTask.type === 'pr' &&
+      typeof linkedTask.number === 'number'
+        ? linkedTask.number
+        : null,
+    linkedGiteeIssue:
+      linkedTask?.provider === 'gitee' && linkedTask.type === 'issue' ? linkedTask.number : null,
     isArchived: folderWorkspace.isArchived,
     isUnread: folderWorkspace.isUnread,
     isPinned: folderWorkspace.isPinned,

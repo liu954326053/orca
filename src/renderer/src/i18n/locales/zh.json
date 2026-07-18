@@ -1758,7 +1758,47 @@
         "jiraSortAscending": "升序",
         "jiraSortDescending": "降序",
         "jiraSortBy": "排序方式",
-        "jiraToggleSortDirection": "按{{value0}}排序"
+        "jiraToggleSortDirection": "按{{value0}}排序",
+        "giteeResumeWorkspace": "恢复绑定到 Gitee {{value0}} #{{value1}} 的工作区",
+        "giteeStartWorkspace": "从 Gitee {{value0}} #{{value1}} 启动工作区",
+        "giteeIssues": "议题",
+        "giteePrs": "PR",
+        "giteeOpen": "开启",
+        "giteeClosed": "已关闭",
+        "giteeAll": "全部",
+        "giteeProgressing": "进行中",
+        "giteeRejected": "已拒绝",
+        "giteeView": "Gitee 视图",
+        "giteeState": "Gitee 状态",
+        "giteeRefresh": "刷新 Gitee 工作项",
+        "giteeMerged": "已合并",
+        "giteeDraft": "草稿",
+        "giteeUnknownAuthor": "未知作者",
+        "giteeOpenItem": "打开 Gitee {{value0}} #{{value1}}",
+        "giteeIssuesLower": "议题",
+        "giteePullRequestsLower": "拉取请求",
+        "giteeLoading": "正在加载 Gitee {{value0}}",
+        "giteeEmpty": "没有 Gitee {{value0}}",
+        "giteeSelectProject": "请至少选择一个项目来源。",
+        "giteeChangeFilter": "没有匹配所选状态的工作项。",
+        "giteeCreateIssue": "新建 Issue",
+        "giteeSearchPlaceholder": "搜索议题",
+        "giteeSearchLabel": "搜索 Gitee 工作项",
+        "giteeIssueTitlePlaceholder": "标题",
+        "giteeIssueBodyPlaceholder": "正文（可选）",
+        "giteeCreateIssueSubmit": "创建",
+        "giteeCreateIssueCancel": "取消",
+        "giteeCreateIssueSelectProject": "创建 Issue 前请先选择一个项目。",
+        "giteeCreateIssueFailed": "创建 Issue 失败。",
+        "giteeCreateIssueTitle": "新建 Issue",
+        "giteeCreateIssueFilingIn": "将创建到 {{value0}}",
+        "giteeCreateIssueDescription": "填写标题与可选正文，创建后刷新列表。",
+        "giteeCreateIssueTitleLabel": "标题",
+        "giteeCreateIssueTitlePlaceholder": "简短摘要",
+        "giteeCreateIssueBodyLabel": "正文（可选）",
+        "giteeCreateIssueBodyPlaceholder": "详细说明（支持 Markdown）",
+        "giteeCreateIssueCreating": "创建中...",
+        "gitee_label": "Gitee"
       },
       "Terminal": {
         "73768427cf": "关闭",
@@ -3993,7 +4033,8 @@
           "196c1b5362": "打开 GitLab 任务",
           "0ccba862b8": "打开 GitHub 任务",
           "fee535205b": "任务",
-          "d599269755": "从侧边栏隐藏"
+          "d599269755": "从侧边栏隐藏",
+          "gitee_open": "打开 Gitee 任务"
         },
         "SidebarRepositoryFilterSection": {
           "d3a9c4cea1": "清除",
@@ -6682,7 +6723,9 @@
           "dd67a1b6e1": "在任务源选择器和侧边栏快捷方式中显示 GitLab。",
           "7c5d7fdc20": "GitLab",
           "1db47236cd": "在任务源选择器和侧边栏快捷方式中显示 GitHub。",
-          "e14063e727": "GitHub"
+          "e14063e727": "GitHub",
+          "gitee_label": "Gitee",
+          "gitee_description": "在任务源选择器和侧边栏快捷方式中显示 Gitee。"
         },
         "TerminalAppearanceSection": {
           "a14a427ae4": "窗格分隔线的厚度。",
@@ -10267,6 +10310,33 @@
             "workspaceGone": "无法打开日志 — 工作区已不可用。",
             "notAuthorized": "无法打开日志 — 路径未授权。",
             "alreadyEditable": "日志已处于编辑状态。"
+          },
+          "createReviewBlocked": {
+            "dirty": "创建{{shortLabel}}失败：请先提交或丢弃本地更改，再创建{{reviewLabel}}。",
+            "defaultBranch": "创建{{shortLabel}}失败：请先切换到功能分支，再创建{{reviewLabel}}。",
+            "noUpstream": "创建{{shortLabel}}失败：请先发布此分支，再创建{{reviewLabel}}。",
+            "needsPush": "创建{{shortLabel}}失败：请先推送此分支，再创建{{reviewLabel}}。",
+            "needsSync": "创建{{shortLabel}}失败：请先同步此分支，再创建{{reviewLabel}}。",
+            "authRequired": "创建{{shortLabel}}失败：{{providerName}} 未完成认证。下一步：在本环境中{{authInstruction}}。",
+            "authGitlab": "运行 glab auth login",
+            "authAzureDevOps": "设置 ORCA_AZURE_DEVOPS_TOKEN",
+            "authGitea": "设置 ORCA_GITEA_TOKEN",
+            "authGitee": "设置 ORCA_GITEE_TOKEN",
+            "authGitHub": "运行 gh auth login"
+          },
+          "createReviewError": {
+            "switchBackToBranch": "创建{{shortLabel}}失败：请先切回所选分支，再创建拉取请求。",
+            "dirty": "创建{{shortLabel}}失败：请先提交或丢弃本地更改，再创建拉取请求。",
+            "defaultBranch": "创建{{shortLabel}}失败：请先切换到功能分支，再创建拉取请求。",
+            "noUpstream": "创建{{shortLabel}}失败：请先发布此分支，再创建拉取请求。",
+            "needsPush": "创建{{shortLabel}}失败：请先推送此分支，再创建拉取请求。",
+            "needsSync": "创建{{shortLabel}}失败：请先同步此分支，再创建拉取请求。",
+            "detachedHead": "创建{{shortLabel}}失败：请先切换到某个分支，再创建拉取请求。",
+            "refreshAndRetry": "创建{{shortLabel}}失败：请刷新源代码管理状态后重试。",
+            "baseNotOnRemote": "创建{{shortLabel}}失败：所选目标分支尚未推送到远程。请选择已推送的目标分支，或先推送该分支。",
+            "alreadyExists": "该分支上已存在拉取请求。",
+            "notAuthenticated": "创建{{shortLabel}}失败：{{detail}}",
+            "genericWithDetail": "创建{{shortLabel}}失败：{{detail}}"
           }
         }
       },
@@ -12911,7 +12981,9 @@
       "taskSourceContextSummary": {
         "sourceUnavailable": "{{value0}} 来源不可用：{{value1}}",
         "someSourceHostsUnavailable": "部分 {{value0}} 来源主机不可用：{{value1}}",
-        "reconnectOrUpdateTitle": "重新连接或更新 {{value0}} 以加载此来源。"
+        "reconnectOrUpdateTitle": "重新连接或更新 {{value0}} 以加载此来源。",
+        "setGiteeToken": "{{value0}}。请设置 ORCA_GITEE_TOKEN。",
+        "setGiteeTokenTitle": "在源环境中设置 ORCA_GITEE_TOKEN，然后重新加载 Gitee。"
       },
       "ShortcutKeyCombo": {
         "07eb4985a1": "双击 {{value0}}"

@@ -575,7 +575,7 @@ describe('resolvePrimaryAction', () => {
     })
   })
 
-  it.each(['azure-devops', 'gitea'] as const)(
+  it.each(['azure-devops', 'gitea', 'gitee'] as const)(
     'returns Create PR when a clean tracked %s branch is eligible for review creation',
     (provider) => {
       const result = resolvePrimaryAction(

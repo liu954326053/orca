@@ -261,7 +261,7 @@ describe('resolvePrimaryAction Create PR intent', () => {
     })
   })
 
-  it.each(['azure-devops', 'gitea'] as const)(
+  it.each(['azure-devops', 'gitea', 'gitee'] as const)(
     'returns Create PR intent for a %s branch that needs a safe push before review',
     (provider) => {
       const result = resolvePrimaryAction(

@@ -1,6 +1,5 @@
 import { translate } from '@/i18n/i18n'
-import { getExecutionHostLabel } from '../../../shared/execution-host'
-import type { ExecutionHostScope } from '../../../shared/execution-host'
+import { getExecutionHostLabel, type ExecutionHostScope } from '../../../shared/execution-host'
 import type { ExecutionHostHealth } from '../../../shared/execution-host-registry'
 import type { SshConnectionStatus } from '../../../shared/ssh-types'
 import type { TaskProvider } from '../../../shared/types'
@@ -49,6 +48,7 @@ export function getTaskSourceContextSummary(args: {
   switch (args.provider) {
     case 'github':
     case 'gitlab':
+    case 'gitee':
       return getRepoBackedTaskSourceSummary(args)
     case 'linear':
       return getAccountBackedTaskSourceSummary(args.providerLabel, {
@@ -194,6 +194,8 @@ function getProviderIdentityLabel(
       return identity.namespace && identity.project
         ? `${identity.namespace}/${identity.project}`
         : (identity.projectId ?? null)
+    case 'gitee':
+      return identity.owner && identity.repo ? `${identity.owner}/${identity.repo}` : null
     case 'linear':
       return identity.workspaceName ?? identity.workspaceId ?? null
     case 'jira':

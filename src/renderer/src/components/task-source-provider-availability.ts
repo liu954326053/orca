@@ -1,8 +1,13 @@
+import { translate } from '@/i18n/i18n'
 import { parseExecutionHostId } from '../../../shared/execution-host'
 import type { TaskProvider } from '../../../shared/types'
 import type { PreflightStatus } from '../../../preload/api-types'
 import type { TaskSourceContext } from '../../../shared/task-source-context'
-import type { TaskSourceHostAvailability } from './task-source-context-summary'
+import {
+  getTaskSourceAvailabilityNotice,
+  type TaskSourceAvailabilityNotice,
+  type TaskSourceHostAvailability
+} from './task-source-context-summary'
 
 type ProviderToolStatus = {
   installed: boolean
@@ -74,4 +79,64 @@ export function getRepoBackedProviderAvailability(args: {
     const reason = status ? getProviderReason(status) : null
     return reason ? [{ hostId: context.hostId, reason }] : []
   })
+}
+
+/**
+ * Gitee uses an API token (ORCA_GITEE_TOKEN) rather than a CLI tool.
+ * Returns one availability entry per context whose host preflight has been
+ * checked and whose gitee token is absent or unauthenticated.
+ */
+export function getGiteeProviderAvailability(args: {
+  contexts: readonly TaskSourceContext[]
+  preflightStatus: PreflightStatus | null
+  preflightReady: boolean
+  runtimePreflightStatusByHostId?: ReadonlyMap<
+    TaskSourceContext['hostId'],
+    RuntimeProviderPreflightStatus
+  >
+}): TaskSourceHostAvailability[] {
+  return args.contexts.flatMap((context) => {
+    const hostPreflight = isDesktopOwnedHost(context.hostId)
+      ? { checked: args.preflightReady, status: args.preflightStatus }
+      : args.runtimePreflightStatusByHostId?.get(context.hostId)
+    if (!hostPreflight?.checked) {
+      return []
+    }
+    const gitee = hostPreflight.status?.gitee
+    // Why: if the preflight payload predates Gitee support the field is absent;
+    // treat that as unconfigured rather than a hard blocker.
+    if (!gitee?.tokenConfigured || !gitee.authenticated) {
+      return [{ hostId: context.hostId, reason: 'missing-provider-auth' as const }]
+    }
+    return []
+  })
+}
+
+export function getGiteeTaskSourceAvailabilityNotice(args: {
+  providerLabel: string
+  hostAvailability: readonly TaskSourceHostAvailability[]
+  hostLabelById?: ReadonlyMap<string, string>
+  sourceCount?: number
+}): TaskSourceAvailabilityNotice | null {
+  const notice = getTaskSourceAvailabilityNotice(args)
+  if (
+    !notice ||
+    !args.hostAvailability.some((availability) => availability.reason === 'missing-provider-auth')
+  ) {
+    return notice
+  }
+  // Why: generic provider-auth copy does not tell users how to configure
+  // Gitee's environment-token integration.
+  return {
+    ...notice,
+    label: translate(
+      'auto.components.taskSourceContextSummary.setGiteeToken',
+      '{{value0}}. Set ORCA_GITEE_TOKEN.',
+      { value0: notice.label }
+    ),
+    title: translate(
+      'auto.components.taskSourceContextSummary.setGiteeTokenTitle',
+      'Set ORCA_GITEE_TOKEN in the source environment, then reload Gitee.'
+    )
+  }
 }

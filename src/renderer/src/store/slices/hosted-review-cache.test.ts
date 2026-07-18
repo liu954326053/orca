@@ -101,6 +101,23 @@ describe('hosted review cache revalidation', () => {
     await expect(secondLinkedFetch).resolves.toEqual(review)
   })
 
+  it('refetches when the linked Gitee PR number changes', async () => {
+    mockApi.hostedReview.forBranch.mockResolvedValue(null)
+    const store = makeStore()
+
+    await store.getState().fetchHostedReviewForBranch('/repo', 'feature/gitee', {
+      linkedGiteePR: 41
+    })
+    await store.getState().fetchHostedReviewForBranch('/repo', 'feature/gitee', {
+      linkedGiteePR: 42
+    })
+
+    expect(mockApi.hostedReview.forBranch).toHaveBeenCalledTimes(2)
+    expect(mockApi.hostedReview.forBranch).toHaveBeenLastCalledWith(
+      expect.objectContaining({ linkedGiteePR: 42 })
+    )
+  })
+
   it('serves stale hosted review metadata while revalidating in the background', async () => {
     vi.useFakeTimers()
     vi.setSystemTime(0)

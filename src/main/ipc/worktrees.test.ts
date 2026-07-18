@@ -775,6 +775,8 @@ describe('registerWorktreeHandlers', () => {
       updates: {
         comment: 'keep me',
         isPinned: true,
+        linkedGiteaPR: 11,
+        linkedGiteePR: 12,
         orcaCreatedAt: 123,
         orcaCreationSource: 'desktop',
         orcaCreationWorkspaceLayout: { path: '/workspace', nestWorkspaces: false }
@@ -783,9 +785,11 @@ describe('registerWorktreeHandlers', () => {
 
     expect(store.setWorktreeMeta).toHaveBeenCalledWith('repo-1::/workspace/feature-wt', {
       comment: 'keep me',
-      isPinned: true
+      isPinned: true,
+      linkedGiteaPR: 11,
+      linkedGiteePR: 12
     })
-    expect(result).toMatchObject({ comment: 'keep me', isPinned: true })
+    expect(result).toMatchObject({ linkedGiteaPR: 11, linkedGiteePR: 12 })
   })
 
   it('pushes a remote-client invalidation for renames but not read-state updates', () => {
@@ -1022,7 +1026,9 @@ describe('registerWorktreeHandlers', () => {
     const result = (await handlers['worktrees:create'](null, {
       repoId: 'repo-folder',
       name: 'folder-session',
-      createdWithAgent: 'codex'
+      createdWithAgent: 'codex',
+      linkedGiteePR: 27,
+      linkedGiteeIssue: 18
     })) as { worktree: { id: string } }
 
     expect(addWorktreeMock).not.toHaveBeenCalled()
@@ -1032,6 +1038,8 @@ describe('registerWorktreeHandlers', () => {
         repoId: 'repo-folder',
         path: '/workspace/folder',
         displayName: 'folder-session',
+        linkedGiteePR: 27,
+        linkedGiteeIssue: 18,
         instanceId: expect.stringMatching(/^[0-9a-f-]{36}$/),
         createdWithAgent: 'codex'
       })
@@ -1472,26 +1480,32 @@ describe('registerWorktreeHandlers', () => {
     )
   })
 
-  it('allows a selected Bitbucket PR branch override to match its remote push target', async () => {
+  it.each([
+    { provider: 'bitbucket' as const, linkedKey: 'linkedBitbucketPR' as const },
+    { provider: 'gitea' as const, linkedKey: 'linkedGiteaPR' as const },
+    { provider: 'gitee' as const, linkedKey: 'linkedGiteePR' as const }
+  ])('allows a selected $provider review branch to match its remote push target', async (entry) => {
+    const branchName = `feature/${entry.provider}`
+    const worktreeName = `${entry.provider}-title`
     getBranchConflictKindMock.mockImplementation(async (_repoPath: string, branch: string) =>
-      branch === 'feature/bitbucket' ? 'remote' : null
+      branch === branchName ? 'remote' : null
     )
     listWorktreesMock.mockResolvedValue([
       {
-        path: '/workspace/bitbucket-title',
+        path: `/workspace/${worktreeName}`,
         head: 'abc123',
-        branch: 'refs/heads/feature/bitbucket',
+        branch: `refs/heads/${branchName}`,
         isBare: false,
         isMainWorktree: false
       }
     ])
     store.setWorktreeMeta.mockImplementation((_worktreeId, meta) => meta)
     getHostedReviewForBranchMock.mockResolvedValueOnce({
-      provider: 'bitbucket',
+      provider: entry.provider,
       number: 11,
-      title: 'Bitbucket PR',
+      title: 'Selected review',
       state: 'open',
-      url: 'https://bitbucket.org/team/repo/pull-requests/11',
+      url: `https://example.com/${entry.provider}/reviews/11`,
       status: 'success',
       updatedAt: '2026-05-21T00:00:00Z',
       mergeable: 'UNKNOWN'
@@ -1499,32 +1513,83 @@ describe('registerWorktreeHandlers', () => {
 
     await handlers['worktrees:create'](null, {
       repoId: 'repo-1',
-      name: 'bitbucket-title',
+      name: worktreeName,
       baseBranch: 'abc123',
-      branchNameOverride: 'feature/bitbucket',
-      linkedBitbucketPR: 11,
-      pushTarget: { remoteName: 'origin', branchName: 'feature/bitbucket' }
+      branchNameOverride: branchName,
+      [entry.linkedKey]: 11,
+      pushTarget: { remoteName: 'origin', branchName }
     })
 
     expect(addWorktreeMock).toHaveBeenCalledWith(
       '/workspace/repo',
-      '/workspace/bitbucket-title',
-      'feature/bitbucket',
+      `/workspace/${worktreeName}`,
+      branchName,
       'abc123',
       false
     )
     expect(store.setWorktreeMeta).toHaveBeenCalledWith(
-      'repo-1::/workspace/bitbucket-title',
-      expect.objectContaining({ linkedBitbucketPR: 11 })
+      `repo-1::/workspace/${worktreeName}`,
+      expect.objectContaining({ [entry.linkedKey]: 11 })
     )
     expect(getHostedReviewForBranchMock).toHaveBeenCalledWith(
       expect.objectContaining({
         repoPath: '/workspace/repo',
-        branch: 'feature/bitbucket',
-        linkedBitbucketPR: 11
+        branch: branchName,
+        [entry.linkedKey]: 11
       })
     )
     expect(getPRForBranchMock).not.toHaveBeenCalled()
+  })
+
+  it('prefers a selected Gitee review when both Gitea and Gitee links are present', async () => {
+    getBranchConflictKindMock.mockImplementation(async (_repoPath: string, branch: string) =>
+      branch === 'feature/gitee' ? 'remote' : null
+    )
+    listWorktreesMock.mockResolvedValue([
+      {
+        path: '/workspace/gitee-title',
+        head: 'abc123',
+        branch: 'refs/heads/feature/gitee',
+        isBare: false,
+        isMainWorktree: false
+      },
+      {
+        path: '/workspace/gitee-title-2',
+        head: 'abc123',
+        branch: 'refs/heads/feature/gitee-2',
+        isBare: false,
+        isMainWorktree: false
+      }
+    ])
+    store.setWorktreeMeta.mockImplementation((_worktreeId, meta) => meta)
+    getHostedReviewForBranchMock.mockResolvedValueOnce({
+      provider: 'gitee',
+      number: 22,
+      title: 'Selected Gitee review',
+      state: 'open',
+      url: 'https://gitee.com/acme/repo/pulls/22',
+      status: 'success',
+      updatedAt: '2026-07-17T00:00:00Z',
+      mergeable: 'UNKNOWN'
+    })
+
+    await handlers['worktrees:create'](null, {
+      repoId: 'repo-1',
+      name: 'gitee-title',
+      baseBranch: 'abc123',
+      branchNameOverride: 'feature/gitee',
+      linkedGiteaPR: 11,
+      linkedGiteePR: 22,
+      pushTarget: { remoteName: 'origin', branchName: 'feature/gitee' }
+    })
+
+    expect(addWorktreeMock).toHaveBeenCalledWith(
+      '/workspace/repo',
+      '/workspace/gitee-title',
+      'feature/gitee',
+      'abc123',
+      false
+    )
   })
 
   it('suffixes a selected Bitbucket PR branch when the existing PR is different', async () => {
@@ -3080,6 +3145,8 @@ describe('registerWorktreeHandlers', () => {
       name: 'improve-dashboard',
       linkedIssue: 123,
       linkedPR: 456,
+      linkedGiteaPR: 31,
+      linkedGiteePR: 32,
       createdWithAgent: 'codex',
       linkedLinearIssue: 'ENG-123',
       manualOrder: 123_456
@@ -3100,6 +3167,8 @@ describe('registerWorktreeHandlers', () => {
       expect.objectContaining({
         linkedIssue: 123,
         linkedPR: 456,
+        linkedGiteaPR: 31,
+        linkedGiteePR: 32,
         createdWithAgent: 'codex',
         linkedLinearIssue: 'ENG-123',
         manualOrder: 123_456
@@ -3109,6 +3178,8 @@ describe('registerWorktreeHandlers', () => {
       worktree: expect.objectContaining({
         linkedIssue: 123,
         linkedPR: 456,
+        linkedGiteaPR: 31,
+        linkedGiteePR: 32,
         createdWithAgent: 'codex',
         linkedLinearIssue: 'ENG-123',
         manualOrder: 123_456

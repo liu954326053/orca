@@ -7,6 +7,7 @@ import {
   localizedHostedReviewCopy,
   resolveSupportedHostedReviewCopyProvider
 } from '@/i18n/hosted-review-localized-copy'
+import { translate } from '@/i18n/i18n'
 
 export function canClickBlockedCreateReviewReason(
   reason: HostedReviewCreationBlockedReason | undefined
@@ -25,15 +26,33 @@ export function canClickBlockedCreateReviewReason(
 
 export function resolveHostedReviewAuthInstruction(provider: HostedReviewProvider): string {
   if (provider === 'gitlab') {
-    return 'Run glab auth login'
+    return translate(
+      'auto.components.right.sidebar.createReviewBlocked.authGitlab',
+      'Run glab auth login'
+    )
   }
   if (provider === 'azure-devops') {
-    return 'Set ORCA_AZURE_DEVOPS_TOKEN'
+    return translate(
+      'auto.components.right.sidebar.createReviewBlocked.authAzureDevOps',
+      'Set ORCA_AZURE_DEVOPS_TOKEN'
+    )
   }
   if (provider === 'gitea') {
-    return 'Set ORCA_GITEA_TOKEN'
+    return translate(
+      'auto.components.right.sidebar.createReviewBlocked.authGitea',
+      'Set ORCA_GITEA_TOKEN'
+    )
   }
-  return 'Run gh auth login'
+  if (provider === 'gitee') {
+    return translate(
+      'auto.components.right.sidebar.createReviewBlocked.authGitee',
+      'Set ORCA_GITEE_TOKEN'
+    )
+  }
+  return translate(
+    'auto.components.right.sidebar.createReviewBlocked.authGitHub',
+    'Run gh auth login'
+  )
 }
 
 export function resolveBlockedCreateReviewNoticeMessage(
@@ -51,17 +70,47 @@ export function resolveBlockedCreateReviewNoticeMessage(
   )
   switch (reason) {
     case 'dirty':
-      return `Create ${copy.shortLabel} failed: commit or discard local changes before creating a ${copy.reviewLabel}.`
+      // Why: UI locale must surface blocked-create guidance in the active
+      // language; English remains the defaultValue for en/tests.
+      return translate(
+        'auto.components.right.sidebar.createReviewBlocked.dirty',
+        'Create {{shortLabel}} failed: commit or discard local changes before creating a {{reviewLabel}}.',
+        { shortLabel: copy.shortLabel, reviewLabel: copy.reviewLabel }
+      )
     case 'default_branch':
-      return `Create ${copy.shortLabel} failed: choose a feature branch before creating a ${copy.reviewLabel}.`
+      return translate(
+        'auto.components.right.sidebar.createReviewBlocked.defaultBranch',
+        'Create {{shortLabel}} failed: choose a feature branch before creating a {{reviewLabel}}.',
+        { shortLabel: copy.shortLabel, reviewLabel: copy.reviewLabel }
+      )
     case 'no_upstream':
-      return `Create ${copy.shortLabel} failed: publish this branch before creating a ${copy.reviewLabel}.`
+      return translate(
+        'auto.components.right.sidebar.createReviewBlocked.noUpstream',
+        'Create {{shortLabel}} failed: publish this branch before creating a {{reviewLabel}}.',
+        { shortLabel: copy.shortLabel, reviewLabel: copy.reviewLabel }
+      )
     case 'needs_push':
-      return `Create ${copy.shortLabel} failed: push this branch before creating a ${copy.reviewLabel}.`
+      return translate(
+        'auto.components.right.sidebar.createReviewBlocked.needsPush',
+        'Create {{shortLabel}} failed: push this branch before creating a {{reviewLabel}}.',
+        { shortLabel: copy.shortLabel, reviewLabel: copy.reviewLabel }
+      )
     case 'needs_sync':
-      return `Create ${copy.shortLabel} failed: sync this branch before creating a ${copy.reviewLabel}.`
+      return translate(
+        'auto.components.right.sidebar.createReviewBlocked.needsSync',
+        'Create {{shortLabel}} failed: sync this branch before creating a {{reviewLabel}}.',
+        { shortLabel: copy.shortLabel, reviewLabel: copy.reviewLabel }
+      )
     case 'auth_required':
-      return `Create ${copy.shortLabel} failed: ${copy.providerName} is not authenticated. Next step: ${resolveHostedReviewAuthInstruction(eligibility.provider)} in this environment.`
+      return translate(
+        'auto.components.right.sidebar.createReviewBlocked.authRequired',
+        'Create {{shortLabel}} failed: {{providerName}} is not authenticated. Next step: {{authInstruction}} in this environment.',
+        {
+          shortLabel: copy.shortLabel,
+          providerName: copy.providerName,
+          authInstruction: resolveHostedReviewAuthInstruction(eligibility.provider)
+        }
+      )
     case 'detached_head':
     case 'existing_review':
     case 'fork_head_unsupported':

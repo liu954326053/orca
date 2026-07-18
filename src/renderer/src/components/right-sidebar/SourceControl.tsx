@@ -58,6 +58,7 @@ import {
   type PrimaryAction,
   type RemoteOpKind
 } from './source-control-primary-action'
+import { localizeCreateReviewErrorMessage } from './create-pull-request-review-copy'
 import {
   beginHugeRepoWarningProbe,
   hasDismissedHugeRepoWarning,
@@ -1513,6 +1514,7 @@ function SourceControlInner(): React.JSX.Element {
   const linkedBitbucketPR = activeWorktree?.linkedBitbucketPR ?? null
   const linkedAzureDevOpsPR = activeWorktree?.linkedAzureDevOpsPR ?? null
   const linkedGiteaPR = activeWorktree?.linkedGiteaPR ?? null
+  const linkedGiteePR = activeWorktree?.linkedGiteePR ?? null
   const manualReviewUrl = useMemo(
     () =>
       buildSourceControlManualReviewUrlFromContext({
@@ -1524,6 +1526,7 @@ function SourceControlInner(): React.JSX.Element {
         linkedBitbucketPR,
         linkedAzureDevOpsPR,
         linkedGiteaPR,
+        linkedGiteePR,
         baseRef: compareBaseRef,
         branchName,
         repoRemoteName: activeRepo?.gitRemoteIdentity?.remoteName ?? null,
@@ -1545,6 +1548,7 @@ function SourceControlInner(): React.JSX.Element {
       linkedGitHubPR,
       linkedGitLabMR,
       linkedGiteaPR,
+      linkedGiteePR,
       remoteStatus?.upstreamName
     ]
   )
@@ -1581,7 +1585,8 @@ function SourceControlInner(): React.JSX.Element {
         linkedGitLabMR,
         linkedBitbucketPR,
         linkedAzureDevOpsPR,
-        linkedGiteaPR
+        linkedGiteaPR,
+        linkedGiteePR
       }),
     [
       activeRepo?.id,
@@ -1592,7 +1597,8 @@ function SourceControlInner(): React.JSX.Element {
       linkedBitbucketPR,
       linkedGitHubPR,
       linkedGitLabMR,
-      linkedGiteaPR
+      linkedGiteaPR,
+      linkedGiteePR
     ]
   )
   useEffect(() => {
@@ -1603,7 +1609,8 @@ function SourceControlInner(): React.JSX.Element {
       fallbackGitHubPRNumber !== null ||
       linkedGitLabMR !== null ||
       linkedAzureDevOpsPR !== null ||
-      linkedGiteaPR !== null
+      linkedGiteaPR !== null ||
+      linkedGiteePR !== null
 
     if (!hasConcreteProviderHint) {
       return
@@ -1624,6 +1631,7 @@ function SourceControlInner(): React.JSX.Element {
     hostedReviewCreation,
     linkedAzureDevOpsPR,
     linkedGiteaPR,
+    linkedGiteePR,
     linkedGitHubPR,
     linkedGitLabMR,
     provisionalHostedReviewProvider
@@ -1657,7 +1665,8 @@ function SourceControlInner(): React.JSX.Element {
     linkedGitLabMR,
     linkedBitbucketPR,
     linkedAzureDevOpsPR,
-    linkedGiteaPR
+    linkedGiteaPR,
+    linkedGiteePR
   })
   // Why: when activeRepo.connectionId is truthy, neither the SourceControl
   // effect below nor WorktreeCard.tsx fetches hostedReview for this branch,
@@ -1742,6 +1751,7 @@ function SourceControlInner(): React.JSX.Element {
       linkedBitbucketPR,
       linkedAzureDevOpsPR,
       linkedGiteaPR,
+      linkedGiteePR,
       staleWhileRevalidate: true
     })
     // Why: the GitHub-specific cache powers grouping/check panels; keep that
@@ -1760,7 +1770,8 @@ function SourceControlInner(): React.JSX.Element {
     linkedGitLabMR,
     linkedBitbucketPR,
     linkedAzureDevOpsPR,
-    linkedGiteaPR
+    linkedGiteaPR,
+    linkedGiteePR
   ])
 
   // Why: eligibility is recomputed below, after prGenerating / isCreatingPr are
@@ -2823,6 +2834,9 @@ function SourceControlInner(): React.JSX.Element {
         if (worktreeId && result.provider === 'gitea') {
           await updateWorktreeMeta(worktreeId, { linkedGiteaPR: result.number })
         }
+        if (worktreeId && result.provider === 'gitee') {
+          await updateWorktreeMeta(worktreeId, { linkedGiteePR: result.number })
+        }
         const linkedReviewNumbers = {
           linkedGitHubPR: result.provider === 'github' ? result.number : linkedGitHubPR,
           fallbackGitHubPR: fallbackGitHubPRNumber,
@@ -2830,7 +2844,8 @@ function SourceControlInner(): React.JSX.Element {
           linkedBitbucketPR,
           linkedAzureDevOpsPR:
             result.provider === 'azure-devops' ? result.number : linkedAzureDevOpsPR,
-          linkedGiteaPR: result.provider === 'gitea' ? result.number : linkedGiteaPR
+          linkedGiteaPR: result.provider === 'gitea' ? result.number : linkedGiteaPR,
+          linkedGiteePR: result.provider === 'gitee' ? result.number : linkedGiteePR
         }
         if (result.provider === 'gitlab') {
           await fetchHostedReviewForBranch(repoPath, branch, {
@@ -2891,6 +2906,7 @@ function SourceControlInner(): React.JSX.Element {
       linkedAzureDevOpsPR,
       linkedBitbucketPR,
       linkedGiteaPR,
+      linkedGiteePR,
       linkedGitHubPR,
       linkedGitLabMR,
       setRightSidebarOpen,
@@ -3260,7 +3276,8 @@ function SourceControlInner(): React.JSX.Element {
       linkedGitLabMR,
       linkedBitbucketPR,
       linkedAzureDevOpsPR,
-      linkedGiteaPR
+      linkedGiteaPR,
+      linkedGiteePR
     })
       .then((result) => {
         if (!stale) {
@@ -3305,6 +3322,7 @@ function SourceControlInner(): React.JSX.Element {
     linkedBitbucketPR,
     linkedAzureDevOpsPR,
     linkedGiteaPR,
+    linkedGiteePR,
     prGenerating,
     remoteStatus?.ahead,
     remoteStatus?.behind,
@@ -3432,7 +3450,10 @@ function SourceControlInner(): React.JSX.Element {
 
       setCreatePrIntentNoticeForWorktree(activeWorktreeId, {
         tone: 'destructive',
-        message: result.error
+        message: localizeCreateReviewErrorMessage(
+          result.error,
+          hostedReviewCreateCopy.shortLabel
+        )
       })
     } catch (error) {
       setCreatePrIntentNoticeForWorktree(activeWorktreeId, {
@@ -3643,7 +3664,10 @@ function SourceControlInner(): React.JSX.Element {
 
         setCreatePrIntentNoticeForWorktree(token.worktreeId, {
           tone: 'destructive',
-          message: result.error
+          message: localizeCreateReviewErrorMessage(
+            result.error,
+            hostedReviewCreateCopy.shortLabel
+          )
         })
         return false
       } catch (error) {
@@ -3736,7 +3760,8 @@ function SourceControlInner(): React.JSX.Element {
         linkedGitLabMR,
         linkedBitbucketPR,
         linkedAzureDevOpsPR,
-        linkedGiteaPR
+        linkedGiteaPR,
+        linkedGiteePR
       })
       setHostedReviewCreationState({
         repoId: activeRepo.id,
@@ -3753,6 +3778,7 @@ function SourceControlInner(): React.JSX.Element {
       linkedAzureDevOpsPR,
       linkedBitbucketPR,
       linkedGiteaPR,
+      linkedGiteePR,
       linkedGitHubPR,
       linkedGitLabMR
     ]

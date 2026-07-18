@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { readRepoIdentity } from './github-pr-value-readers'
+import { readProvider, readRepoIdentity } from './github-pr-value-readers'
+
+describe('readProvider', () => {
+  it('accepts Gitee as a hosted review provider', () => {
+    expect(readProvider('gitee')).toBe('gitee')
+  })
+})
 
 describe('readRepoIdentity', () => {
   it('parses a valid owner/repo identity', () => {

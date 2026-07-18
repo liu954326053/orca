@@ -3036,6 +3036,7 @@ describe('OrcaRuntimeService', () => {
     const result = await runtime.createManagedWorktree({
       repoSelector: 'id:folder-repo',
       name: 'folder-session',
+      linkedGiteePR: 88,
       createdWithAgent: 'codex'
     })
 
@@ -3046,6 +3047,7 @@ describe('OrcaRuntimeService', () => {
         repoId: 'folder-repo',
         path: '/workspace/folder',
         displayName: 'folder-session',
+        linkedGiteePR: 88,
         isMainWorktree: false,
         createdWithAgent: 'codex'
       })
@@ -3053,6 +3055,7 @@ describe('OrcaRuntimeService', () => {
     expect(metaById[result.worktree.id]).toMatchObject({
       instanceId: result.worktree.instanceId,
       displayName: 'folder-session',
+      linkedGiteePR: 88,
       orcaCreationSource: 'runtime',
       createdWithAgent: 'codex'
     })
@@ -3743,6 +3746,71 @@ describe('OrcaRuntimeService', () => {
     }
   })
 
+  it('creates a selected Gitee PR branch without conflating it with Gitea', async () => {
+    const runtime = new OrcaRuntimeService(store)
+    const createdWorktree = {
+      path: '/tmp/workspaces/gitee-title',
+      head: 'abc123',
+      branch: 'refs/heads/feature/gitee',
+      isBare: false,
+      isMainWorktree: false
+    }
+    computeWorktreePathMock.mockReturnValue(createdWorktree.path)
+    ensurePathWithinWorkspaceMock.mockReturnValue(createdWorktree.path)
+    vi.mocked(getBranchConflictKind).mockResolvedValueOnce('remote')
+    vi.mocked(listWorktrees).mockResolvedValueOnce([createdWorktree])
+    getHostedReviewForBranchMock.mockResolvedValueOnce({
+      provider: 'gitee',
+      number: 12,
+      title: 'Gitee PR',
+      state: 'open',
+      url: 'https://gitee.com/acme/orca/pulls/12',
+      status: 'success',
+      updatedAt: '2026-07-17T00:00:00Z',
+      mergeable: 'UNKNOWN'
+    })
+    const gitSpy = vi.spyOn(gitRunner, 'gitExecFileAsync').mockResolvedValue({
+      stdout: '',
+      stderr: ''
+    })
+
+    try {
+      const result = await runtime.createManagedWorktree({
+        repoSelector: 'id:repo-1',
+        name: 'gitee-title',
+        baseBranch: 'abc123',
+        branchNameOverride: 'feature/gitee',
+        linkedGiteaPR: 11,
+        linkedGiteePR: 12,
+        pushTarget: { remoteName: 'origin', branchName: 'feature/gitee' }
+      })
+
+      expect(getHostedReviewForBranchMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          repoPath: TEST_REPO_PATH,
+          branch: 'feature/gitee',
+          linkedGiteaPR: 11,
+          linkedGiteePR: 12
+        })
+      )
+      expect(getPRForBranchMock).not.toHaveBeenCalled()
+      expect(addWorktree).toHaveBeenCalledWith(
+        TEST_REPO_PATH,
+        createdWorktree.path,
+        'feature/gitee',
+        'abc123',
+        false
+      )
+      expect(result.worktree).toMatchObject({
+        path: createdWorktree.path,
+        branch: 'refs/heads/feature/gitee',
+        linkedGiteePR: 12
+      })
+    } finally {
+      gitSpy.mockRestore()
+    }
+  })
+
   it('suffixes an existing PR when a matching push target lacks selected PR metadata', async () => {
     const runtime = new OrcaRuntimeService(store)
     const createdWorktree = {
@@ -4166,6 +4234,8 @@ describe('OrcaRuntimeService', () => {
       name: 'mobile-feature',
       linkedGitLabIssue: 321,
       linkedGitLabMR: 654,
+      linkedGiteePR: 765,
+      linkedGiteeIssue: 864,
       startup: { command: 'claude' }
     })
 
@@ -4179,14 +4249,89 @@ describe('OrcaRuntimeService', () => {
       id: `${TEST_REPO_ID}::${created.path}`,
       path: created.path,
       linkedGitLabIssue: 321,
-      linkedGitLabMR: 654
+      linkedGitLabMR: 654,
+      linkedGiteePR: 765,
+      linkedGiteeIssue: 864
     })
     expect(metaById[result.worktree.id]).toMatchObject({
       linkedGitLabIssue: 321,
-      linkedGitLabMR: 654
+      linkedGitLabMR: 654,
+      linkedGiteePR: 765,
+      linkedGiteeIssue: 864
     })
     expect(addWorktree).not.toHaveBeenCalled()
     expect(listWorktrees).not.toHaveBeenCalled()
+  })
+
+  it('clears stale Gitea and Gitee links when recreating an SSH worktree with explicit nulls', async () => {
+    vi.mocked(listWorktrees).mockClear()
+    vi.mocked(addWorktree).mockClear()
+    const created = {
+      path: '/remote/mobile-feature',
+      head: 'def',
+      branch: 'refs/heads/mobile-feature',
+      isBare: false,
+      isMainWorktree: false
+    }
+    const worktreeId = `${TEST_REPO_ID}::${created.path}`
+    const metaById: Record<string, WorktreeMeta> = {
+      [worktreeId]: makeWorktreeMeta({ linkedGiteaPR: 41, linkedGiteePR: 42 })
+    }
+    const remoteStore = {
+      ...store,
+      getRepos: () => [
+        {
+          id: TEST_REPO_ID,
+          path: '/remote/repo',
+          displayName: 'repo',
+          badgeColor: 'blue',
+          addedAt: 1,
+          connectionId: 'ssh-1'
+        }
+      ],
+      getAllWorktreeMeta: () => metaById,
+      getWorktreeMeta: (id: string) => metaById[id],
+      setWorktreeMeta: (id: string, meta: Partial<WorktreeMeta>) => {
+        metaById[id] = { ...(metaById[id] ?? makeWorktreeMeta()), ...meta }
+        return metaById[id]
+      }
+    }
+    const provider = {
+      exec: vi.fn(async (args: string[]) => {
+        if (args[0] === 'config') {
+          return { stdout: 'Remote User\n', stderr: '' }
+        }
+        if (args[0] === 'branch') {
+          return { stdout: '', stderr: '' }
+        }
+        if (args[0] === 'symbolic-ref') {
+          return { stdout: 'origin/main\n', stderr: '' }
+        }
+        if (isOriginMainBaseRefProbe(args)) {
+          return { stdout: 'main-sha\n', stderr: '' }
+        }
+        if (args[0] === 'fetch') {
+          return { stdout: '', stderr: '' }
+        }
+        throw new Error(`unexpected git call: ${args.join(' ')}`)
+      }),
+      addWorktree: vi.fn().mockResolvedValue(undefined),
+      listWorktrees: vi.fn().mockResolvedValue([created])
+    }
+    registerSshGitProvider('ssh-1', provider as never)
+    const runtime = new OrcaRuntimeService(remoteStore as never)
+
+    const result = await runtime.createManagedWorktree({
+      repoSelector: TEST_REPO_ID,
+      name: 'mobile-feature',
+      linkedGiteaPR: null,
+      linkedGiteePR: null
+    })
+
+    expect(result.worktree).toMatchObject({ linkedGiteaPR: null, linkedGiteePR: null })
+    expect(metaById[worktreeId]).toMatchObject({ linkedGiteaPR: null, linkedGiteePR: null })
+    expect(metaById[worktreeId].linkedGiteaPR).not.toBe(41)
+    expect(metaById[worktreeId].linkedGiteePR).not.toBe(42)
   })
 
   it('records lineage for SSH-backed CLI-created worktrees', async () => {

@@ -39,6 +39,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { isFolderRepo } from '../../../../shared/repo-kind'
 import HostedReviewActions from './HostedReviewActions'
+import { isHostedReviewMutationProvider } from './hosted-review-mutation-provider'
 import {
   PullRequestIcon,
   prStateColor,
@@ -104,6 +105,7 @@ import {
 } from './checks-panel-empty-state'
 import { hasAmbiguousGitHubHostedReviewForChecksPanel } from './checks-panel-ambiguous-github-review'
 import { recordChecksPanelPRRefreshBreadcrumb } from './checks-panel-pr-refresh-breadcrumb'
+import { resolveChecksPanelRefreshRoute } from './checks-panel-refresh-routing'
 import {
   cancelRuntimeGeneratePullRequestFields,
   generateRuntimePullRequestFields,
@@ -555,6 +557,7 @@ export default function ChecksPanel(): React.JSX.Element {
     linkedBitbucketPR: activeWorktree?.linkedBitbucketPR ?? null,
     linkedAzureDevOpsPR: activeWorktree?.linkedAzureDevOpsPR ?? null,
     linkedGiteaPR: activeWorktree?.linkedGiteaPR ?? null,
+    linkedGiteePR: activeWorktree?.linkedGiteePR ?? null,
     runtimeEnvironmentId,
     repoConnectionId,
     pushTarget: activeWorktreePushTarget
@@ -672,16 +675,29 @@ export default function ChecksPanel(): React.JSX.Element {
   const linkedBitbucketPR = activeWorktree?.linkedBitbucketPR ?? null
   const linkedAzureDevOpsPR = activeWorktree?.linkedAzureDevOpsPR ?? null
   const linkedGiteaPR = activeWorktree?.linkedGiteaPR ?? null
+  const linkedGiteePR = activeWorktree?.linkedGiteePR ?? null
   const activeReview: ChecksPanelReview | null = selectChecksPanelReview({
     hostedReview,
     pr,
     linkedGitLabMR,
     linkedBitbucketPR,
     linkedAzureDevOpsPR,
-    linkedGiteaPR
+    linkedGiteaPR,
+    linkedGiteePR
   })
   const activeGitLabReview = isGitLabChecksPanelReview(activeReview) ? activeReview : null
-  const isGitLabReviewContext = Boolean(activeGitLabReview || linkedGitLabMR !== null)
+  // Why: only GitHub may use the GitHub-only refresh path; every other hosted
+  // provider (Gitee/Gitea/Bitbucket/Azure) routes through the provider-neutral
+  // hosted-review refresh so a Gitee link never triggers a GitHub breadcrumb or
+  // fetchPRForBranch lookup.
+  const refreshRoute = resolveChecksPanelRefreshRoute({
+    activeReviewProvider: activeReview?.provider ?? null,
+    linkedGitLabMR,
+    linkedBitbucketPR,
+    linkedAzureDevOpsPR,
+    linkedGiteaPR,
+    linkedGiteePR
+  })
   const activeConflictReview = activeReview?.mergeable === 'CONFLICTING' ? activeReview : null
   const prRefreshState = useAppStore((s) =>
     prCacheKey ? s.getEffectiveGitHubPRRefreshState(prCacheKey, prRefreshStateNow) : undefined
@@ -816,7 +832,8 @@ export default function ChecksPanel(): React.JSX.Element {
           linkedGitLabMR,
           linkedBitbucketPR,
           linkedAzureDevOpsPR,
-          linkedGiteaPR
+          linkedGiteaPR,
+          linkedGiteePR
         })
       : ''
   const gitStatusInputs = readChecksPanelGitStatusSnapshot(gitStatusSnapshot, panelContextKey)
@@ -1229,9 +1246,10 @@ export default function ChecksPanel(): React.JSX.Element {
         linkedBitbucketPR,
         linkedAzureDevOpsPR,
         linkedGiteaPR,
+        linkedGiteePR,
         staleWhileRevalidate: true
       })
-      if (activeWorktreeId && !isGitLabReviewContext) {
+      if (activeWorktreeId && refreshRoute.strategy === 'github') {
         const refreshRequest = resolveChecksPanelPRRefreshRequest({
           cachedHasPR: prCachedHasPR,
           cachedFetchedAt: prFetchedAt ?? null,
@@ -1247,12 +1265,13 @@ export default function ChecksPanel(): React.JSX.Element {
     fallbackGitHubPRNumber,
     fetchHostedReviewForBranch,
     isFolder,
-    isGitLabReviewContext,
+    refreshRoute.strategy,
     isPanelVisible,
     activeWorktree?.head,
     linkedAzureDevOpsPR,
     linkedBitbucketPR,
     linkedGiteaPR,
+    linkedGiteePR,
     linkedGitLabMR,
     linkedPR,
     prCachedHasPR,
@@ -1468,7 +1487,8 @@ export default function ChecksPanel(): React.JSX.Element {
       linkedGitLabMR,
       linkedBitbucketPR,
       linkedAzureDevOpsPR,
-      linkedGiteaPR
+      linkedGiteaPR,
+      linkedGiteePR
     })
       .then((result) => {
         if (!stale) {
@@ -1505,6 +1525,7 @@ export default function ChecksPanel(): React.JSX.Element {
     linkedBitbucketPR,
     linkedAzureDevOpsPR,
     linkedGiteaPR,
+    linkedGiteePR,
     remoteStatus?.ahead,
     remoteStatus?.behind,
     remoteStatus?.hasUpstream,
@@ -1912,7 +1933,7 @@ export default function ChecksPanel(): React.JSX.Element {
     refreshRequestKeyRef.current = refreshRequestKey
     const isCurrentRequest = (): boolean => refreshRequestKeyRef.current === refreshRequestKey
     const refreshStartedAt = Date.now()
-    const refreshProvider = isGitLabReviewContext ? 'gitlab' : 'github'
+    const refreshProvider = refreshRoute.provider
     let refreshOutcome = 'started'
     setIsRefreshing(true)
     recordChecksPanelPRRefreshBreadcrumb({
@@ -2003,7 +2024,7 @@ export default function ChecksPanel(): React.JSX.Element {
           console.warn('[ChecksPanel] pre-refresh git identity refresh failed', error)
         }
       }
-      if (isGitLabReviewContext) {
+      if (refreshRoute.strategy === 'gitlab') {
         const refreshedReview = await refreshHostedReviewCard(fetchHostedReviewForBranch, {
           repoPath: repo.path,
           repoId: repo.id,
@@ -2013,7 +2034,8 @@ export default function ChecksPanel(): React.JSX.Element {
           linkedGitLabMR,
           linkedBitbucketPR,
           linkedAzureDevOpsPR,
-          linkedGiteaPR
+          linkedGiteaPR,
+          linkedGiteePR
         })
         if (!isCurrentRequest()) {
           return
@@ -2032,6 +2054,30 @@ export default function ChecksPanel(): React.JSX.Element {
           setComments([])
           refreshOutcome = 'no-review'
         }
+        return
+      }
+      if (refreshRoute.strategy === 'hosted-review') {
+        // Why: Gitee/Gitea/Bitbucket/Azure reviews must not touch GitHub-only
+        // lookups (fetchPRForBranch/fetchPRChecks); refresh the hosted-review
+        // card through the provider-neutral path keyed by the linked number.
+        await refreshHostedReviewCard(fetchHostedReviewForBranch, {
+          repoPath: repo.path,
+          repoId: repo.id,
+          branch,
+          linkedGitHubPR: linkedPR,
+          fallbackGitHubPR: fallbackGitHubPRNumber,
+          linkedGitLabMR,
+          linkedBitbucketPR,
+          linkedAzureDevOpsPR,
+          linkedGiteaPR,
+          linkedGiteePR
+        })
+        if (!isCurrentRequest()) {
+          return
+        }
+        setChecks([])
+        setComments([])
+        refreshOutcome = 'review'
         return
       }
       const refreshStoreState = useAppStore.getState()
@@ -2067,7 +2113,8 @@ export default function ChecksPanel(): React.JSX.Element {
         linkedGitLabMR,
         linkedBitbucketPR,
         linkedAzureDevOpsPR,
-        linkedGiteaPR
+        linkedGiteaPR,
+        linkedGiteePR
       })
       if (!isCurrentRequest()) {
         return
@@ -2202,9 +2249,11 @@ export default function ChecksPanel(): React.JSX.Element {
     linkedAzureDevOpsPR,
     linkedBitbucketPR,
     linkedGiteaPR,
+    linkedGiteePR,
     linkedGitLabMR,
     isFolder,
-    isGitLabReviewContext,
+    refreshRoute.provider,
+    refreshRoute.strategy,
     gitStatusSnapshot,
     panelContextKey,
     fetchPRForBranch,
@@ -2226,7 +2275,9 @@ export default function ChecksPanel(): React.JSX.Element {
       // user refresh. Route PR refresh through the coordinator so rate-limit
       // guards still apply; only force detail panes that the entry freshness rule
       // already proved stale, so tab entry stays fresh without broad fan-out.
-      if (isGitLabReviewContext) {
+      // Non-GitHub providers (GitLab + Gitee/Gitea/Bitbucket/Azure) refresh the
+      // provider-neutral hosted-review card and never enqueue a GitHub refresh.
+      if (refreshRoute.strategy !== 'github') {
         void fetchHostedReviewForBranch(repo.path, branch, {
           force: true,
           repoId: repo.id,
@@ -2236,7 +2287,8 @@ export default function ChecksPanel(): React.JSX.Element {
           linkedGitLabMR,
           linkedBitbucketPR,
           linkedAzureDevOpsPR,
-          linkedGiteaPR
+          linkedGiteaPR,
+          linkedGiteePR
         })
         if (activeGitLabReview) {
           void fetchGitLabDetails()
@@ -2262,10 +2314,11 @@ export default function ChecksPanel(): React.JSX.Element {
       fetchComments,
       fetchGitLabDetails,
       fetchHostedReviewForBranch,
-      isGitLabReviewContext,
+      refreshRoute.strategy,
       linkedAzureDevOpsPR,
       linkedBitbucketPR,
       linkedGiteaPR,
+      linkedGiteePR,
       linkedGitLabMR,
       linkedPR,
       repo
@@ -2334,7 +2387,8 @@ export default function ChecksPanel(): React.JSX.Element {
         linkedGitLabMR,
         linkedBitbucketPR,
         linkedAzureDevOpsPR,
-        linkedGiteaPR
+        linkedGiteaPR,
+        linkedGiteePR
       })
       const refreshedGitLabReview =
         refreshedReview?.provider === 'gitlab' ? refreshedReview : activeGitLabReview
@@ -2363,7 +2417,8 @@ export default function ChecksPanel(): React.JSX.Element {
       linkedGitLabMR,
       linkedBitbucketPR,
       linkedAzureDevOpsPR,
-      linkedGiteaPR
+      linkedGiteaPR,
+      linkedGiteePR
     })
   }, [
     activeGitLabReview,
@@ -2377,13 +2432,17 @@ export default function ChecksPanel(): React.JSX.Element {
     linkedAzureDevOpsPR,
     linkedBitbucketPR,
     linkedGiteaPR,
+    linkedGiteePR,
     linkedGitLabMR,
     linkedPR,
     repo
   ])
 
+  const canMutateActiveReview =
+    activeReview !== null && isHostedReviewMutationProvider(activeReview.provider)
+
   const handleStartEdit = useCallback(() => {
-    if (!activeReview) {
+    if (!activeReview || !canMutateActiveReview) {
       return
     }
     setTitleDraft(activeReview.title)
@@ -2393,7 +2452,7 @@ export default function ChecksPanel(): React.JSX.Element {
       titleInputFocusTimerRef.current = null
       titleInputRef.current?.focus()
     }, 0)
-  }, [activeReview, clearTitleInputFocusTimer])
+  }, [activeReview, canMutateActiveReview, clearTitleInputFocusTimer])
 
   const handleCancelEdit = useCallback(() => {
     clearTitleInputFocusTimer()
@@ -2403,7 +2462,13 @@ export default function ChecksPanel(): React.JSX.Element {
 
   const handleSaveTitle = useCallback(async () => {
     const nextTitle = titleDraft.trim()
-    if (!repo || !activeReview || !nextTitle || nextTitle === activeReview.title) {
+    if (
+      !repo ||
+      !activeReview ||
+      !canMutateActiveReview ||
+      !nextTitle ||
+      nextTitle === activeReview.title
+    ) {
       clearTitleInputFocusTimer()
       setEditingTitle(false)
       return
@@ -2446,6 +2511,7 @@ export default function ChecksPanel(): React.JSX.Element {
     }
   }, [
     activeReview,
+    canMutateActiveReview,
     repo,
     pr,
     titleDraft,
@@ -3028,7 +3094,8 @@ export default function ChecksPanel(): React.JSX.Element {
           linkedGitLabMR,
           linkedBitbucketPR,
           linkedAzureDevOpsPR,
-          linkedGiteaPR
+          linkedGiteaPR,
+          linkedGiteePR
         })
         if (!isCurrentRequestContext()) {
           return
@@ -3135,6 +3202,7 @@ export default function ChecksPanel(): React.JSX.Element {
       linkedAzureDevOpsPR,
       linkedBitbucketPR,
       linkedGiteaPR,
+      linkedGiteePR,
       linkedGitLabMR,
       panelContextKey,
       prCacheKey,
@@ -3286,6 +3354,9 @@ export default function ChecksPanel(): React.JSX.Element {
         if (activeWorktreeId && result.provider === 'gitea') {
           await updateWorktreeMeta(activeWorktreeId, { linkedGiteaPR: result.number })
         }
+        if (activeWorktreeId && result.provider === 'gitee') {
+          await updateWorktreeMeta(activeWorktreeId, { linkedGiteePR: result.number })
+        }
         const linkedReviewNumbers = {
           linkedGitHubPR: result.provider === 'github' ? result.number : linkedPR,
           fallbackGitHubPR: fallbackGitHubPRNumber,
@@ -3293,7 +3364,8 @@ export default function ChecksPanel(): React.JSX.Element {
           linkedBitbucketPR,
           linkedAzureDevOpsPR:
             result.provider === 'azure-devops' ? result.number : linkedAzureDevOpsPR,
-          linkedGiteaPR: result.provider === 'gitea' ? result.number : linkedGiteaPR
+          linkedGiteaPR: result.provider === 'gitea' ? result.number : linkedGiteaPR,
+          linkedGiteePR: result.provider === 'gitee' ? result.number : linkedGiteePR
         }
         if (result.provider === 'gitlab') {
           const refreshedReview = await refreshHostedReviewCard(fetchHostedReviewForBranch, {
@@ -3333,6 +3405,7 @@ export default function ChecksPanel(): React.JSX.Element {
       linkedAzureDevOpsPR,
       linkedBitbucketPR,
       linkedGiteaPR,
+      linkedGiteePR,
       linkedGitLabMR,
       linkedPR,
       refreshLinkedGitHubPullRequest,
@@ -3716,7 +3789,7 @@ export default function ChecksPanel(): React.JSX.Element {
         {detachedHeadDisplay && <DetachedHeadBadge display={detachedHeadDisplay} side="bottom" />}
 
         {/* Review title */}
-        {editingTitle ? (
+        {canMutateActiveReview && editingTitle ? (
           <div className="flex items-center gap-1">
             <input
               ref={titleInputRef}
@@ -3747,7 +3820,7 @@ export default function ChecksPanel(): React.JSX.Element {
               <X className="size-3.5" />
             </button>
           </div>
-        ) : (
+        ) : canMutateActiveReview ? (
           <div
             className="group/title flex items-start gap-1.5 cursor-pointer -mx-1 px-1 py-0.5 rounded hover:bg-accent/40 transition-colors"
             onClick={handleStartEdit}
@@ -3756,6 +3829,12 @@ export default function ChecksPanel(): React.JSX.Element {
               {activeReview.title}
             </span>
             <Pencil className="size-3 text-muted-foreground/40 can-hover:opacity-0 group-hover/title:opacity-100 transition-opacity shrink-0 mt-0.5" />
+          </div>
+        ) : (
+          <div className="flex items-start gap-1.5 px-1 py-0.5">
+            <span className="text-[12px] text-foreground leading-snug flex-1">
+              {activeReview.title}
+            </span>
           </div>
         )}
 

@@ -1,0 +1,285 @@
+# 社区/个人仓库用：构建 macOS 与 Windows 桌面安装包并发布到 GitHub Release。
+# 说明：默认不做 Apple/Windows 官方签名与公证；适合自用分发与冒烟验证。
+name: 构建并发布桌面安装包
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 发布标签（例如 v1.4.144-gitee.1）
+        required: true
+        type: string
+      prerelease:
+        description: 是否标记为预发布
+        required: false
+        type: boolean
+        default: true
+  push:
+    tags:
+      - 'v*-gitee*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-and-release-desktop-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  NODE_OPTIONS: --max-old-space-size=8192
+  # 未配置签名证书时允许未签名产物
+  CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+  # 社区构建身份：走 rc 通道遥测门禁，避免误标官方 stable
+  ORCA_BUILD_IDENTITY: rc
+
+jobs:
+  build-macos:
+    name: 构建 macOS 安装包
+    runs-on: macos-15
+    timeout-minutes: 90
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 安装 pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: 安装 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: package.json
+          cache: pnpm
+
+      - name: 缓存 electron-builder 下载
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/electron
+            ~/Library/Caches/electron-builder
+          key: electron-builder-mac-community-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            electron-builder-mac-community-
+
+      - name: 安装依赖
+        run: pnpm install --frozen-lockfile
+
+      - name: 编译应用与原生组件
+        run: |
+          set -euo pipefail
+          pnpm run build:release
+          pnpm run build:computer-macos
+          pnpm run build:notification-status-macos
+          pnpm run ensure:electron-runtime
+
+      - name: 打包 macOS 安装包（arm64）
+        run: |
+          set -euo pipefail
+          pnpm exec electron-builder \
+            --config config/electron-builder.config.cjs \
+            --mac \
+            --arm64 \
+            --publish never
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 上传 macOS 产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-installers
+          path: |
+            dist/*.dmg
+            dist/*.zip
+            dist/*.blockmap
+            dist/latest-mac.yml
+          if-no-files-found: error
+          retention-days: 14
+
+  build-windows:
+    name: 构建 Windows 安装包
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 安装 pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: 安装 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: package.json
+          cache: pnpm
+
+      - name: 缓存 electron-builder 下载
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~\AppData\Local\electron\Cache
+            ~\AppData\Local\electron-builder\Cache
+          key: electron-builder-win-community-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            electron-builder-win-community-
+
+      - name: 安装依赖
+        shell: bash
+        run: pnpm install --frozen-lockfile
+
+      - name: 编译应用与 Windows 原生组件
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm run build:release
+          node config/scripts/build-windows-cli-launcher.mjs
+          pnpm run ensure:electron-runtime
+
+      - name: 打包 Windows 安装包
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm exec electron-builder \
+            --config config/electron-builder.config.cjs \
+            --win \
+            --x64 \
+            --publish never
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 上传 Windows 产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installers
+          path: |
+            dist/*.exe
+            dist/*.blockmap
+            dist/latest.yml
+          if-no-files-found: error
+          retention-days: 14
+
+  publish-release:
+    name: 发布 GitHub Release
+    needs: [build-macos, build-windows]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: 解析标签
+        id: tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            tag="${{ inputs.tag }}"
+          else
+            tag="${GITHUB_REF_NAME}"
+          fi
+          if [[ -z "$tag" ]]; then
+            echo "缺少发布标签" >&2
+            exit 1
+          fi
+          if [[ "$tag" != v* ]]; then
+            tag="v${tag}"
+          fi
+          echo "tag=$tag" >>"$GITHUB_OUTPUT"
+          echo "使用标签: $tag"
+
+      - name: 下载 macOS 产物
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-installers
+          path: release-assets/macos
+
+      - name: 下载 Windows 产物
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-installers
+          path: release-assets/windows
+
+      - name: 汇总产物
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets/all
+          find release-assets/macos release-assets/windows -type f -print
+          cp -f release-assets/macos/* release-assets/all/ 2>/dev/null || true
+          cp -f release-assets/windows/* release-assets/all/ 2>/dev/null || true
+          ls -lah release-assets/all
+
+      - name: 创建或更新 Release 并上传安装包
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.tag.outputs.tag }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          IS_PRERELEASE: ${{ github.event_name == 'workflow_dispatch' && inputs.prerelease || contains(steps.tag.outputs.tag, 'gitee') || contains(steps.tag.outputs.tag, 'rc') }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          notes_file="$(mktemp)"
+          {
+            echo "## Orca 桌面安装包（${TAG}）"
+            echo
+            echo "本版本由 GitHub Actions 自动构建并发布，包含："
+            echo
+            echo "- **macOS**：\`orca-macos-arm64.dmg\` / zip（Apple Silicon）"
+            echo "- **Windows**：\`orca-windows-setup.exe\`（x64）"
+            echo
+            echo "### 本版本主要内容"
+            echo "- 新增 **Gitee** 一等支持：任务页议题/PR、Source Control 创建/查看 PR"
+            echo "- 支持 Gitee 字母数字议题编号（如 IK1X2N）"
+            echo "- 新建 Issue、状态筛选（开启/进行中/已关闭/全部）、关键词搜索"
+            echo "- 本地分支名兼容（如 \`origin/dev-client\`）"
+            echo "- 创建 PR 阻断提示中文化"
+            echo
+            echo "### 使用说明"
+            echo "1. 从下方 Assets 下载对应系统安装包"
+            echo "2. macOS：打开 dmg 并拖入「应用程序」；若提示未签名，可在「系统设置 → 隐私与安全性」中允许"
+            echo "3. Windows：运行 setup 安装包"
+            echo "4. Gitee 功能需设置环境变量：\`ORCA_GITEE_TOKEN\`"
+            echo
+            echo "### 注意"
+            echo "- 本工作流产物默认**未做** Apple 公证 / Windows 商业签名，适合内部分发与测试"
+            echo "- 构建仓库：\`${REPO}\`"
+            echo "- 提交：\`${SHA}\`"
+          } >"$notes_file"
+
+          prerelease_args=()
+          if [[ "$IS_PRERELEASE" == "true" ]]; then
+            prerelease_args+=(--prerelease)
+          fi
+
+          if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
+            echo "Release $TAG 已存在，更新说明并上传产物"
+            gh release edit "$TAG" \
+              --repo "$REPO" \
+              --title "Orca ${TAG}（Gitee 增强版）" \
+              --notes-file "$notes_file" \
+              "${prerelease_args[@]}"
+          else
+            echo "创建 Release $TAG（target=$SHA）"
+            gh release create "$TAG" \
+              --repo "$REPO" \
+              --target "$SHA" \
+              --title "Orca ${TAG}（Gitee 增强版）" \
+              --notes-file "$notes_file" \
+              "${prerelease_args[@]}"
+          fi
+
+          shopt -s nullglob
+          assets=(release-assets/all/*)
+          if ((${#assets[@]} == 0)); then
+            echo "没有可上传的安装包" >&2
+            exit 1
+          fi
+          gh release upload "$TAG" "${assets[@]}" \
+            --repo "$REPO" \
+            --clobber
+
+          echo "发布完成: https://github.com/${REPO}/releases/tag/${TAG}"

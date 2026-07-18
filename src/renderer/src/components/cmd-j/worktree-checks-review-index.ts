@@ -62,7 +62,8 @@ export function buildWorktreeChecksReviewIndex({
       linkedGitLabMR: worktree.linkedGitLabMR ?? null,
       linkedBitbucketPR: worktree.linkedBitbucketPR ?? null,
       linkedAzureDevOpsPR: worktree.linkedAzureDevOpsPR ?? null,
-      linkedGiteaPR: worktree.linkedGiteaPR ?? null
+      linkedGiteaPR: worktree.linkedGiteaPR ?? null,
+      linkedGiteePR: worktree.linkedGiteePR ?? null
     })
     if (review) {
       // Why: persisted IDs can be identical across execution hosts; the search
@@ -72,7 +73,8 @@ export function buildWorktreeChecksReviewIndex({
       worktree.linkedGitLabMR != null ||
       worktree.linkedBitbucketPR != null ||
       worktree.linkedAzureDevOpsPR != null ||
-      worktree.linkedGiteaPR != null
+      worktree.linkedGiteaPR != null ||
+      worktree.linkedGiteePR != null
     ) {
       // Why: an empty Checks selection for a non-GitHub link is authoritative;
       // omitting it would let Cmd+J surface stale GitHub metadata as a fallback.

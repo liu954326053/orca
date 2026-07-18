@@ -215,6 +215,7 @@ type RefreshHostedReviewCardArgs = {
   linkedBitbucketPR?: number | null
   linkedAzureDevOpsPR?: number | null
   linkedGiteaPR?: number | null
+  linkedGiteePR?: number | null
 }
 
 export function refreshHostedReviewCard(
@@ -230,7 +231,8 @@ export function refreshHostedReviewCard(
     linkedGitLabMR: args.linkedGitLabMR ?? null,
     linkedBitbucketPR: args.linkedBitbucketPR ?? null,
     linkedAzureDevOpsPR: args.linkedAzureDevOpsPR ?? null,
-    linkedGiteaPR: args.linkedGiteaPR ?? null
+    linkedGiteaPR: args.linkedGiteaPR ?? null,
+    linkedGiteePR: args.linkedGiteePR ?? null
   })
 }
 
@@ -351,7 +353,8 @@ export const createHostedReviewSlice: StateCreator<AppState, [], [], HostedRevie
             linkedGitLabMR: options?.linkedGitLabMR ?? null,
             linkedBitbucketPR: options?.linkedBitbucketPR ?? null,
             linkedAzureDevOpsPR: options?.linkedAzureDevOpsPR ?? null,
-            linkedGiteaPR: options?.linkedGiteaPR ?? null
+            linkedGiteaPR: options?.linkedGiteaPR ?? null,
+            linkedGiteePR: options?.linkedGiteePR ?? null
           }
           const review =
             target.kind === 'environment'

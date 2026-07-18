@@ -45,9 +45,9 @@ export function getLinkedWorkItemSuggestedName(item: { title: string }): string 
 
 export type WorkspaceIntentWorkItem = {
   type: 'issue' | 'pr' | 'mr'
-  number: number
+  number: string | number
   title: string
-  provider?: 'github' | 'gitlab' | 'linear' | 'jira'
+  provider?: 'github' | 'gitlab' | 'gitee' | 'linear' | 'jira'
   linearIdentifier?: string
   jiraIdentifier?: string
 }
@@ -148,8 +148,11 @@ function compactWorkItemTitle(title: string, item: WorkspaceIntentWorkItem): str
     .replace(/\([#!]?\d+\)/g, '')
     .replace(/^[^:]{1,32}:\s*/, '')
     .trim()
-  if (item.number > 0) {
-    withoutPrefix = withoutPrefix.replace(new RegExp(`\\b[#!]?${item.number}\\b`, 'g'), '').trim()
+  const publicNumber = String(item.number).trim()
+  if (publicNumber && publicNumber !== '0') {
+    withoutPrefix = withoutPrefix
+      .replace(new RegExp(`\\b[#!]?${escapeRegExp(publicNumber)}\\b`, 'g'), '')
+      .trim()
   }
   if (identifier) {
     withoutPrefix = withoutPrefix

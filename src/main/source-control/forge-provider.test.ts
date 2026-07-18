@@ -5,9 +5,11 @@ const {
   createGitLabMergeRequestMock,
   createAzureDevOpsPullRequestMock,
   createGiteaPullRequestMock,
+  createGiteePullRequestMock,
   getAzureDevOpsRepoSlugMock,
   getBitbucketRepoSlugMock,
   getGiteaRepoSlugMock,
+  getGiteeRepoSlugMock,
   getMergeRequestForBranchMock,
   getProjectSlugMock,
   getPRForBranchOutcomeMock,
@@ -18,9 +20,11 @@ const {
   createGitLabMergeRequestMock: vi.fn(),
   createAzureDevOpsPullRequestMock: vi.fn(),
   createGiteaPullRequestMock: vi.fn(),
+  createGiteePullRequestMock: vi.fn(),
   getAzureDevOpsRepoSlugMock: vi.fn(),
   getBitbucketRepoSlugMock: vi.fn(),
   getGiteaRepoSlugMock: vi.fn(),
+  getGiteeRepoSlugMock: vi.fn(),
   getMergeRequestForBranchMock: vi.fn(),
   getProjectSlugMock: vi.fn(),
   getPRForBranchOutcomeMock: vi.fn(),
@@ -74,6 +78,16 @@ vi.mock('../gitea/pull-request-creation', () => ({
   createGiteaPullRequest: createGiteaPullRequestMock
 }))
 
+vi.mock('../gitee/client', () => ({
+  getGiteeRepoSlug: getGiteeRepoSlugMock,
+  getGiteePullRequestForBranch: vi.fn(),
+  getGiteePullRequest: vi.fn()
+}))
+
+vi.mock('../gitee/pull-request-creation', () => ({
+  createGiteePullRequest: createGiteePullRequestMock
+}))
+
 import {
   FORGE_PROVIDERS,
   detectHostedReviewProvider,
@@ -87,9 +101,11 @@ describe('forge provider interface', () => {
     createGitLabMergeRequestMock.mockReset()
     createAzureDevOpsPullRequestMock.mockReset()
     createGiteaPullRequestMock.mockReset()
+    createGiteePullRequestMock.mockReset()
     getAzureDevOpsRepoSlugMock.mockReset()
     getBitbucketRepoSlugMock.mockReset()
     getGiteaRepoSlugMock.mockReset()
+    getGiteeRepoSlugMock.mockReset()
     getMergeRequestForBranchMock.mockReset()
     getProjectSlugMock.mockReset()
     getPRForBranchOutcomeMock.mockReset()
@@ -136,6 +152,7 @@ describe('forge provider interface', () => {
     getEnterpriseGitHubRepoSlugMock.mockResolvedValue(null)
     getBitbucketRepoSlugMock.mockResolvedValue(null)
     getAzureDevOpsRepoSlugMock.mockResolvedValue(null)
+    getGiteeRepoSlugMock.mockResolvedValue(null)
     getGiteaRepoSlugMock.mockResolvedValue({
       host: 'gitea.example.com',
       owner: 'team',
@@ -147,6 +164,25 @@ describe('forge provider interface', () => {
     await expect(detectHostedReviewProvider({ repoPath: '/repo' })).resolves.toBe('gitea')
   })
 
+  it('detects gitee.com before the catch-all Gitea provider', async () => {
+    getProjectSlugMock.mockResolvedValue(null)
+    getRepoSlugMock.mockResolvedValue(null)
+    getEnterpriseGitHubRepoSlugMock.mockResolvedValue(null)
+    getBitbucketRepoSlugMock.mockResolvedValue(null)
+    getAzureDevOpsRepoSlugMock.mockResolvedValue(null)
+    getGiteeRepoSlugMock.mockResolvedValue({
+      host: 'gitee.com',
+      owner: 'team',
+      repo: 'orca',
+      apiBaseUrl: 'https://gitee.com/api/v5',
+      webBaseUrl: 'https://gitee.com'
+    })
+
+    await expect(detectHostedReviewProvider({ repoPath: '/repo' })).resolves.toBe('gitee')
+    expect(getGiteeRepoSlugMock).toHaveBeenCalledWith('/repo', undefined)
+    expect(getGiteaRepoSlugMock).not.toHaveBeenCalled()
+  })
+
   it('keeps review creation capability scoped to providers with creation support', async () => {
     expect(
       FORGE_PROVIDERS.map((provider) => [provider.id, provider.supportsReviewCreation])
@@ -155,6 +191,7 @@ describe('forge provider interface', () => {
       ['github', true],
       ['bitbucket', false],
       ['azure-devops', true],
+      ['gitee', true],
       ['gitea', true]
     ])
     createGitHubPullRequestMock.mockResolvedValue({
@@ -289,6 +326,44 @@ describe('forge provider interface', () => {
         title: 'Add provider interface'
       },
       'ssh-1'
+    )
+  })
+
+  it('routes Gitee review creation through the shared provider contract', async () => {
+    createGiteePullRequestMock.mockResolvedValue({
+      ok: true,
+      number: 20,
+      url: 'https://gitee.com/team/orca/pulls/20'
+    })
+
+    const provider = getForgeProviderById('gitee')
+    await expect(
+      provider.createReview?.(
+        '/repo',
+        {
+          provider: 'gitee',
+          base: 'main',
+          head: 'feature/provider-interface',
+          title: 'Add provider interface'
+        },
+        'ssh-1',
+        { localGitExecOptions: { wslDistro: 'Ubuntu' } }
+      )
+    ).resolves.toEqual({
+      ok: true,
+      number: 20,
+      url: 'https://gitee.com/team/orca/pulls/20'
+    })
+    expect(createGiteePullRequestMock).toHaveBeenCalledWith(
+      '/repo',
+      {
+        provider: 'gitee',
+        base: 'main',
+        head: 'feature/provider-interface',
+        title: 'Add provider interface'
+      },
+      'ssh-1',
+      { localGitExecOptions: { wslDistro: 'Ubuntu' } }
     )
   })
 

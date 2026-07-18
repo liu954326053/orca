@@ -6,6 +6,7 @@ import {
   resolveVisibleTaskProvider
 } from '../../../../shared/task-providers'
 import { cn } from '@/lib/utils'
+import { GiteeIcon } from '@/components/icons/GiteeIcon'
 import { JiraIcon } from '@/components/icons/JiraIcon'
 import { LinearIcon } from '@/components/icons/LinearIcon'
 import { Label } from '../ui/label'
@@ -49,6 +50,19 @@ const TASK_PROVIDER_OPTIONS: readonly {
       )
     },
     Icon: ({ className }) => <Gitlab className={className} />
+  },
+  {
+    id: 'gitee',
+    get label() {
+      return translate('auto.components.settings.TasksPane.gitee_label', 'Gitee')
+    },
+    get description() {
+      return translate(
+        'auto.components.settings.TasksPane.gitee_description',
+        'Show Gitee in the Tasks source picker and sidebar shortcuts.'
+      )
+    },
+    Icon: ({ className }) => <GiteeIcon className={className} />
   },
   {
     id: 'linear',
@@ -120,6 +134,7 @@ export function TasksPane({ settings, updateSettings }: TasksPaneProps): React.J
             'source',
             'github',
             'gitlab',
+            'gitee',
             'linear',
             'jira',
             'atlassian',

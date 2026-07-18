@@ -29,7 +29,8 @@ describe('hosted review RPC methods', () => {
       makeRequest('hostedReview.forBranch', {
         repo: 'C:\\repo',
         branch: 'feature/windows',
-        linkedGitHubPR: 12
+        linkedGitHubPR: 12,
+        linkedGiteePR: 34
       })
     )
 
@@ -41,7 +42,8 @@ describe('hosted review RPC methods', () => {
       linkedGitLabMR: null,
       linkedBitbucketPR: null,
       linkedAzureDevOpsPR: null,
-      linkedGiteaPR: null
+      linkedGiteaPR: null,
+      linkedGiteePR: 34
     })
     expect(response).toMatchObject({
       ok: true,
@@ -75,7 +77,8 @@ describe('hosted review RPC methods', () => {
         hasUpstream: true,
         ahead: 0,
         behind: 0,
-        linkedGitHubPR: null
+        linkedGitHubPR: null,
+        linkedGiteePR: 35
       })
     )
 
@@ -92,7 +95,8 @@ describe('hosted review RPC methods', () => {
       linkedGitLabMR: null,
       linkedBitbucketPR: null,
       linkedAzureDevOpsPR: null,
-      linkedGiteaPR: null
+      linkedGiteaPR: null,
+      linkedGiteePR: 35
     })
     expect(response).toMatchObject({
       ok: true,
@@ -105,8 +109,9 @@ describe('hosted review RPC methods', () => {
       getRuntimeId: () => 'test-runtime',
       createHostedReview: vi.fn().mockResolvedValue({
         ok: true,
+        provider: 'gitee',
         number: 51,
-        url: 'https://github.com/acme/orca/pull/51'
+        url: 'https://gitee.com/acme/orca/pulls/51'
       })
     } as unknown as OrcaRuntimeService
     const dispatcher = new RpcDispatcher({ runtime, methods: HOSTED_REVIEW_METHODS })
@@ -115,7 +120,7 @@ describe('hosted review RPC methods', () => {
       makeRequest('hostedReview.create', {
         repo: 'repo-1',
         worktree: 'path:/worktrees/feature',
-        provider: 'github',
+        provider: 'gitee',
         base: 'main',
         head: 'feature/create-pr',
         title: 'Create PR',
@@ -127,7 +132,7 @@ describe('hosted review RPC methods', () => {
     expect(runtime.createHostedReview).toHaveBeenCalledWith({
       repoSelector: 'repo-1',
       worktreeSelector: 'path:/worktrees/feature',
-      provider: 'github',
+      provider: 'gitee',
       base: 'main',
       head: 'feature/create-pr',
       title: 'Create PR',

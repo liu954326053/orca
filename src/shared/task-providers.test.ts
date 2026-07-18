@@ -9,14 +9,19 @@ import {
 
 describe('task providers', () => {
   it('normalizes provider lists while preserving supported order', () => {
-    expect(normalizeVisibleTaskProviders(['gitlab', 'unknown', 'gitlab', 'linear'])).toEqual([
-      'gitlab',
-      'linear'
-    ])
+    expect(
+      normalizeVisibleTaskProviders(['gitlab', 'unknown', 'gitee', 'gitlab', 'linear'])
+    ).toEqual(['gitlab', 'gitee', 'linear'])
   })
 
   it('falls back to all providers when none are visible', () => {
-    expect(normalizeVisibleTaskProviders([])).toEqual(['github', 'gitlab', 'linear', 'jira'])
+    expect(normalizeVisibleTaskProviders([])).toEqual([
+      'github',
+      'gitlab',
+      'gitee',
+      'linear',
+      'jira'
+    ])
   })
 
   it('restores a valid saved default when provider settings drifted', () => {
@@ -115,5 +120,14 @@ describe('task providers', () => {
         linearConnected: false
       })
     ).toEqual(['github'])
+  })
+
+  it('keeps Gitee selectable while authentication setup is incomplete', () => {
+    expect(
+      filterAvailableTaskProviders(['gitee'], {
+        gitlabInstalled: false,
+        linearConnected: false
+      })
+    ).toEqual(['gitee'])
   })
 })

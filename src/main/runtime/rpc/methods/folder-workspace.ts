@@ -5,9 +5,9 @@ import { isTuiAgent } from '../../../../shared/tui-agent-config'
 
 const FolderWorkspaceLinkedTask = z
   .object({
-    provider: z.enum(['github', 'gitlab', 'linear', 'jira']),
+    provider: z.enum(['github', 'gitlab', 'linear', 'jira', 'gitee']),
     type: z.enum(['issue', 'pr', 'mr']),
-    number: z.number().finite(),
+    number: z.union([z.number().finite(), z.string().trim().min(1)]),
     title: requiredString('Missing linked task title'),
     url: requiredString('Missing linked task URL'),
     linearIdentifier: OptionalString,

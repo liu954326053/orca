@@ -4,9 +4,12 @@ import type {
   CrashReportBreadcrumbData,
   CrashReportDetailValue
 } from '../../../../shared/crash-reporting'
+import type { HostedReviewProvider } from '../../../../shared/hosted-review'
 
 type ChecksPanelPRRefreshBreadcrumbEvent = 'start' | 'done' | 'stale_cleared'
-type ChecksPanelReviewProvider = 'github' | 'gitlab'
+// Why: refreshes can target any hosted provider (Gitee/Gitea/Bitbucket/Azure),
+// not just GitHub/GitLab; keep the breadcrumb provider faithful to the route.
+type ChecksPanelReviewProvider = HostedReviewProvider
 
 type ChecksPanelPRRefreshBreadcrumbArgs = {
   event: ChecksPanelPRRefreshBreadcrumbEvent

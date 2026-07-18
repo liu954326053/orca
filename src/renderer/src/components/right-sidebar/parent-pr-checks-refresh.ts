@@ -24,6 +24,7 @@ type FetchHostedReview = (
     linkedBitbucketPR?: number | null
     linkedAzureDevOpsPR?: number | null
     linkedGiteaPR?: number | null
+    linkedGiteePR?: number | null
     currentHeadOid?: string | null
   }
 ) => Promise<HostedReviewInfo | null>
@@ -135,6 +136,7 @@ async function refreshParentPrChecksCandidate(
       linkedBitbucketPR: candidate.worktree.linkedBitbucketPR ?? null,
       linkedAzureDevOpsPR: candidate.worktree.linkedAzureDevOpsPR ?? null,
       linkedGiteaPR: candidate.worktree.linkedGiteaPR ?? null,
+      linkedGiteePR: candidate.worktree.linkedGiteePR ?? null,
       currentHeadOid: candidate.worktree.head ?? null,
       staleWhileRevalidate: true
     })
@@ -195,6 +197,7 @@ function hasLinkedReview(worktree: Worktree): boolean {
     worktree.linkedBitbucketPR ??
     worktree.linkedAzureDevOpsPR ??
     worktree.linkedGiteaPR ??
+    worktree.linkedGiteePR ??
     null
   )
 }

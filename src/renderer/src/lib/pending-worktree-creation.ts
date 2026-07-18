@@ -73,6 +73,8 @@ export type WorktreeCreationRequest = {
   linkedBitbucketPR?: number | null
   linkedAzureDevOpsPR?: number | null
   linkedGiteaPR?: number | null
+  linkedGiteePR?: number | null
+  linkedGiteeIssue?: string | number | null
   /** Backend-spawn startup payload (`createWorktree` arg). Present only when the
    *  agent launch is self-contained; otherwise the renderer drives startup via
    *  `startupPlan`. */

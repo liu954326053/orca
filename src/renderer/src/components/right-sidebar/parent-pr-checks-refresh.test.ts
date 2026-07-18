@@ -120,7 +120,8 @@ describe('parent PR checks refresh', () => {
       linkedGitLabMR: 9,
       linkedBitbucketPR: 10,
       linkedAzureDevOpsPR: 11,
-      linkedGiteaPR: 12
+      linkedGiteaPR: 12,
+      linkedGiteePR: 13
     })
     const candidates = getParentPrChecksRefreshCandidates({
       worktrees: [unlinked, linked],
@@ -147,6 +148,7 @@ describe('parent PR checks refresh', () => {
         linkedBitbucketPR: 10,
         linkedAzureDevOpsPR: 11,
         linkedGiteaPR: 12,
+        linkedGiteePR: 13,
         currentHeadOid: 'abc',
         staleWhileRevalidate: true
       }

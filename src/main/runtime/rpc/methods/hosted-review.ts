@@ -11,7 +11,8 @@ const HostedReviewForBranch = z.object({
   linkedGitLabMR: z.number().int().positive().nullable().optional(),
   linkedBitbucketPR: z.number().int().positive().nullable().optional(),
   linkedAzureDevOpsPR: z.number().int().positive().nullable().optional(),
-  linkedGiteaPR: z.number().int().positive().nullable().optional()
+  linkedGiteaPR: z.number().int().positive().nullable().optional(),
+  linkedGiteePR: z.number().int().positive().nullable().optional()
 })
 
 const HostedReviewCreationEligibility = z.object({
@@ -28,13 +29,22 @@ const HostedReviewCreationEligibility = z.object({
   linkedGitLabMR: z.number().int().positive().nullable().optional(),
   linkedBitbucketPR: z.number().int().positive().nullable().optional(),
   linkedAzureDevOpsPR: z.number().int().positive().nullable().optional(),
-  linkedGiteaPR: z.number().int().positive().nullable().optional()
+  linkedGiteaPR: z.number().int().positive().nullable().optional(),
+  linkedGiteePR: z.number().int().positive().nullable().optional()
 })
 
 const HostedReviewCreate = z.object({
   repo: requiredString('Missing repo selector'),
   worktree: z.string().min(1, 'Missing worktree selector').optional(),
-  provider: z.enum(['github', 'gitlab', 'bitbucket', 'azure-devops', 'gitea', 'unsupported']),
+  provider: z.enum([
+    'github',
+    'gitlab',
+    'bitbucket',
+    'azure-devops',
+    'gitea',
+    'gitee',
+    'unsupported'
+  ]),
   base: requiredString('Missing base branch'),
   head: z.string().optional(),
   title: requiredString('Missing title'),
@@ -59,7 +69,8 @@ export const HOSTED_REVIEW_METHODS: RpcMethod[] = [
         linkedGitLabMR: params.linkedGitLabMR ?? null,
         linkedBitbucketPR: params.linkedBitbucketPR ?? null,
         linkedAzureDevOpsPR: params.linkedAzureDevOpsPR ?? null,
-        linkedGiteaPR: params.linkedGiteaPR ?? null
+        linkedGiteaPR: params.linkedGiteaPR ?? null,
+        linkedGiteePR: params.linkedGiteePR ?? null
       })
     }
   }),
@@ -83,7 +94,8 @@ export const HOSTED_REVIEW_METHODS: RpcMethod[] = [
         linkedGitLabMR: params.linkedGitLabMR ?? null,
         linkedBitbucketPR: params.linkedBitbucketPR ?? null,
         linkedAzureDevOpsPR: params.linkedAzureDevOpsPR ?? null,
-        linkedGiteaPR: params.linkedGiteaPR ?? null
+        linkedGiteaPR: params.linkedGiteaPR ?? null,
+        linkedGiteePR: params.linkedGiteePR ?? null
       })
     }
   }),

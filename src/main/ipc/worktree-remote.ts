@@ -845,6 +845,7 @@ type SelectedReviewBranchInput = Pick<
   | 'linkedBitbucketPR'
   | 'linkedAzureDevOpsPR'
   | 'linkedGiteaPR'
+  | 'linkedGiteePR'
   | 'pushTarget'
 >
 
@@ -865,6 +866,11 @@ function getSelectedReviewBranch(args: SelectedReviewBranchInput): SelectedRevie
   }
   if (typeof args.linkedAzureDevOpsPR === 'number') {
     return { provider: 'azure-devops', number: args.linkedAzureDevOpsPR }
+  }
+  // Why: forge detection checks Gitee before Gitea's catch-all, so stale dual
+  // links must use the same priority when choosing the review branch.
+  if (typeof args.linkedGiteePR === 'number') {
+    return { provider: 'gitee', number: args.linkedGiteePR }
   }
   if (typeof args.linkedGiteaPR === 'number') {
     return { provider: 'gitea', number: args.linkedGiteaPR }
@@ -916,13 +922,15 @@ function getSelectedReviewLookupHints(args: SelectedReviewBranchInput): {
   linkedBitbucketPR?: number | null
   linkedAzureDevOpsPR?: number | null
   linkedGiteaPR?: number | null
+  linkedGiteePR?: number | null
 } {
   return {
     linkedGitHubPR: args.linkedPR ?? null,
     linkedGitLabMR: args.linkedGitLabMR ?? null,
     linkedBitbucketPR: args.linkedBitbucketPR ?? null,
     linkedAzureDevOpsPR: args.linkedAzureDevOpsPR ?? null,
-    linkedGiteaPR: args.linkedGiteaPR ?? null
+    linkedGiteaPR: args.linkedGiteaPR ?? null,
+    linkedGiteePR: args.linkedGiteePR ?? null
   }
 }
 
@@ -1920,6 +1928,8 @@ export async function createRemoteWorktree(
       ? { linkedAzureDevOpsPR: args.linkedAzureDevOpsPR }
       : {}),
     ...(args.linkedGiteaPR !== undefined ? { linkedGiteaPR: args.linkedGiteaPR } : {}),
+    ...(args.linkedGiteePR !== undefined ? { linkedGiteePR: args.linkedGiteePR } : {}),
+    ...(args.linkedGiteeIssue !== undefined ? { linkedGiteeIssue: args.linkedGiteeIssue } : {}),
     ...(args.workspaceStatus !== undefined ? { workspaceStatus: args.workspaceStatus } : {})
   }
   const { worktree } = timing.timeSync('persist_metadata', () => {
@@ -2543,6 +2553,8 @@ export async function createLocalWorktree(
       ? { linkedAzureDevOpsPR: args.linkedAzureDevOpsPR }
       : {}),
     ...(args.linkedGiteaPR !== undefined ? { linkedGiteaPR: args.linkedGiteaPR } : {}),
+    ...(args.linkedGiteePR !== undefined ? { linkedGiteePR: args.linkedGiteePR } : {}),
+    ...(args.linkedGiteeIssue !== undefined ? { linkedGiteeIssue: args.linkedGiteeIssue } : {}),
     ...(args.workspaceStatus !== undefined ? { workspaceStatus: args.workspaceStatus } : {})
   }
   const { worktree } = timing.timeSync('persist_metadata', () => {

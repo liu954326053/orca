@@ -10,7 +10,9 @@ const {
   getAzureDevOpsRepoSlugMock,
   getAzureDevOpsPullRequestForBranchMock,
   getGiteaRepoSlugMock,
-  getGiteaPullRequestForBranchMock
+  getGiteaPullRequestForBranchMock,
+  getGiteeRepoSlugMock,
+  getGiteePullRequestForBranchMock
 } = vi.hoisted(() => ({
   getProjectSlugMock: vi.fn(),
   getMergeRequestForBranchMock: vi.fn(),
@@ -21,7 +23,9 @@ const {
   getAzureDevOpsRepoSlugMock: vi.fn(),
   getAzureDevOpsPullRequestForBranchMock: vi.fn(),
   getGiteaRepoSlugMock: vi.fn(),
-  getGiteaPullRequestForBranchMock: vi.fn()
+  getGiteaPullRequestForBranchMock: vi.fn(),
+  getGiteeRepoSlugMock: vi.fn(),
+  getGiteePullRequestForBranchMock: vi.fn()
 }))
 
 vi.mock('../gitlab/client', () => ({
@@ -54,6 +58,12 @@ vi.mock('../gitea/client', () => ({
   getGiteaPullRequest: vi.fn()
 }))
 
+vi.mock('../gitee/client', () => ({
+  getGiteeRepoSlug: getGiteeRepoSlugMock,
+  getGiteePullRequestForBranch: getGiteePullRequestForBranchMock,
+  getGiteePullRequest: vi.fn()
+}))
+
 import { getHostedReviewForBranch } from './hosted-review'
 
 describe('getHostedReviewForBranch', () => {
@@ -68,6 +78,8 @@ describe('getHostedReviewForBranch', () => {
     getAzureDevOpsPullRequestForBranchMock.mockReset()
     getGiteaRepoSlugMock.mockReset()
     getGiteaPullRequestForBranchMock.mockReset()
+    getGiteeRepoSlugMock.mockReset()
+    getGiteePullRequestForBranchMock.mockReset()
   })
 
   it('maps GitLab merge requests into the hosted review surface', async () => {
@@ -257,6 +269,7 @@ describe('getHostedReviewForBranch', () => {
     getRepoSlugMock.mockResolvedValue(null)
     getBitbucketRepoSlugMock.mockResolvedValue(null)
     getAzureDevOpsRepoSlugMock.mockResolvedValue(null)
+    getGiteeRepoSlugMock.mockResolvedValue(null)
     getGiteaRepoSlugMock.mockResolvedValue({
       host: 'git.example.com',
       owner: 'team',
@@ -298,6 +311,102 @@ describe('getHostedReviewForBranch', () => {
       14,
       'ssh-1'
     )
+  })
+
+  it('resolves a linked Gitee pull request for detached HEAD without consulting Gitea', async () => {
+    getProjectSlugMock.mockResolvedValue(null)
+    getRepoSlugMock.mockResolvedValue(null)
+    getBitbucketRepoSlugMock.mockResolvedValue(null)
+    getAzureDevOpsRepoSlugMock.mockResolvedValue(null)
+    getGiteeRepoSlugMock.mockResolvedValue({
+      host: 'gitee.com',
+      owner: 'team',
+      repo: 'orca',
+      apiBaseUrl: 'https://gitee.com/api/v5',
+      webBaseUrl: 'https://gitee.com'
+    })
+    getGiteePullRequestForBranchMock.mockResolvedValue({
+      number: 23,
+      title: 'Gitee detached review',
+      state: 'open',
+      url: 'https://gitee.com/team/orca/pulls/23',
+      status: 'pending',
+      updatedAt: '2026-07-17T00:00:00.000Z',
+      mergeable: 'UNKNOWN',
+      headSha: 'abc789'
+    })
+
+    await expect(
+      getHostedReviewForBranch({
+        repoPath: '/repo',
+        connectionId: 'ssh-1',
+        branch: '',
+        linkedGiteePR: 23
+      })
+    ).resolves.toEqual({
+      provider: 'gitee',
+      number: 23,
+      title: 'Gitee detached review',
+      state: 'open',
+      url: 'https://gitee.com/team/orca/pulls/23',
+      status: 'pending',
+      updatedAt: '2026-07-17T00:00:00.000Z',
+      mergeable: 'UNKNOWN',
+      headSha: 'abc789'
+    })
+    expect(getGiteePullRequestForBranchMock).toHaveBeenCalledWith('/repo', '', 23, 'ssh-1')
+    expect(getGiteaRepoSlugMock).not.toHaveBeenCalled()
+    expect(getGiteaPullRequestForBranchMock).not.toHaveBeenCalled()
+  })
+
+  it('treats a literal HEAD branch as detached and returns null without probing any provider', async () => {
+    await expect(
+      getHostedReviewForBranch({
+        repoPath: '/repo',
+        connectionId: 'ssh-1',
+        branch: 'HEAD'
+      })
+    ).resolves.toBeNull()
+    expect(getProjectSlugMock).not.toHaveBeenCalled()
+    expect(getRepoSlugMock).not.toHaveBeenCalled()
+    expect(getGiteeRepoSlugMock).not.toHaveBeenCalled()
+    expect(getGiteaRepoSlugMock).not.toHaveBeenCalled()
+  })
+
+  it('resolves a linked Gitee pull request for a literal HEAD branch via exact-number lookup', async () => {
+    getProjectSlugMock.mockResolvedValue(null)
+    getRepoSlugMock.mockResolvedValue(null)
+    getBitbucketRepoSlugMock.mockResolvedValue(null)
+    getAzureDevOpsRepoSlugMock.mockResolvedValue(null)
+    getGiteeRepoSlugMock.mockResolvedValue({
+      host: 'gitee.com',
+      owner: 'team',
+      repo: 'orca',
+      apiBaseUrl: 'https://gitee.com/api/v5',
+      webBaseUrl: 'https://gitee.com'
+    })
+    getGiteePullRequestForBranchMock.mockResolvedValue({
+      number: 23,
+      title: 'Gitee detached review',
+      state: 'open',
+      url: 'https://gitee.com/team/orca/pulls/23',
+      status: 'pending',
+      updatedAt: '2026-07-17T00:00:00.000Z',
+      mergeable: 'UNKNOWN',
+      headSha: 'abc789'
+    })
+
+    await expect(
+      getHostedReviewForBranch({
+        repoPath: '/repo',
+        connectionId: 'ssh-1',
+        branch: 'HEAD',
+        linkedGiteePR: 23
+      })
+    ).resolves.toMatchObject({ provider: 'gitee', number: 23 })
+    // Why: the literal HEAD is normalized to an empty branch so the provider
+    // takes the exact-number path instead of searching for a branch named HEAD.
+    expect(getGiteePullRequestForBranchMock).toHaveBeenCalledWith('/repo', '', 23, 'ssh-1')
   })
 
   it('falls through to Azure DevOps before Gitea when origin is an Azure Repos remote', async () => {

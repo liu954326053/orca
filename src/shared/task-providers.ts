@@ -1,6 +1,12 @@
-export type TaskProvider = 'github' | 'gitlab' | 'linear' | 'jira'
+export type TaskProvider = 'github' | 'gitlab' | 'gitee' | 'linear' | 'jira'
 
-export const TASK_PROVIDERS: readonly TaskProvider[] = ['github', 'gitlab', 'linear', 'jira']
+export const TASK_PROVIDERS: readonly TaskProvider[] = [
+  'github',
+  'gitlab',
+  'gitee',
+  'linear',
+  'jira'
+]
 
 const TASK_PROVIDER_SET = new Set<TaskProvider>(TASK_PROVIDERS)
 
@@ -100,9 +106,9 @@ function isTaskProviderAvailable(
   if (provider === 'gitlab') {
     return availability.gitlabInstalled
   }
-  // Why: Jira can be connected from the Tasks surface itself, so hiding it
-  // when disconnected would remove the entry point for first-time setup.
-  if (provider === 'jira') {
+  // Why: Jira can be connected and Gitee token failures can be resolved from
+  // the Tasks surface, so hiding either would remove its setup entry point.
+  if (provider === 'gitee' || provider === 'jira') {
     return true
   }
   return availability.linearConnected

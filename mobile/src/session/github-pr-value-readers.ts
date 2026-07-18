@@ -48,6 +48,7 @@ export function readProvider(value: unknown): HostedReviewProvider | undefined {
     value === 'bitbucket' ||
     value === 'azure-devops' ||
     value === 'gitea' ||
+    value === 'gitee' ||
     value === 'unsupported'
     ? value
     : undefined

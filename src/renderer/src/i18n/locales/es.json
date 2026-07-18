@@ -1758,7 +1758,47 @@
         "jiraSortAscending": "ascendente",
         "jiraSortDescending": "descendente",
         "jiraSortBy": "Ordenar por",
-        "jiraToggleSortDirection": "Ordenar de forma {{value0}}"
+        "jiraToggleSortDirection": "Ordenar de forma {{value0}}",
+        "giteeResumeWorkspace": "Resume workspace attached to Gitee {{value0}} #{{value1}}",
+        "giteeStartWorkspace": "Start workspace from Gitee {{value0}} #{{value1}}",
+        "giteeIssues": "Issues",
+        "giteePrs": "PRs",
+        "giteeOpen": "Open",
+        "giteeClosed": "Closed",
+        "giteeAll": "All",
+        "giteeView": "Gitee view",
+        "giteeState": "Gitee state",
+        "giteeRefresh": "Refresh Gitee work items",
+        "giteeMerged": "Merged",
+        "giteeDraft": "Draft",
+        "giteeUnknownAuthor": "Unknown author",
+        "giteeOpenItem": "Open Gitee {{value0}} #{{value1}}",
+        "giteeIssuesLower": "issues",
+        "giteePullRequestsLower": "pull requests",
+        "giteeLoading": "Loading Gitee {{value0}}",
+        "giteeEmpty": "No Gitee {{value0}}",
+        "giteeSelectProject": "Select at least one project source.",
+        "giteeChangeFilter": "No items match the selected state.",
+        "gitee_label": "Gitee",
+        "giteeProgressing": "Progressing",
+        "giteeRejected": "Rejected",
+        "giteeCreateIssue": "New issue",
+        "giteeSearchPlaceholder": "Search issues",
+        "giteeSearchLabel": "Search Gitee work items",
+        "giteeIssueTitlePlaceholder": "Title",
+        "giteeIssueBodyPlaceholder": "Description (optional)",
+        "giteeCreateIssueSubmit": "Create",
+        "giteeCreateIssueCancel": "Cancel",
+        "giteeCreateIssueSelectProject": "Select a project before creating an issue.",
+        "giteeCreateIssueFailed": "Failed to create issue.",
+        "giteeCreateIssueTitle": "New issue",
+        "giteeCreateIssueFilingIn": "Filing in {{value0}}",
+        "giteeCreateIssueDescription": "Add a title and optional description. The list refreshes after creation.",
+        "giteeCreateIssueTitleLabel": "Title",
+        "giteeCreateIssueTitlePlaceholder": "Short summary",
+        "giteeCreateIssueBodyLabel": "Description (optional)",
+        "giteeCreateIssueBodyPlaceholder": "Details (Markdown supported)",
+        "giteeCreateIssueCreating": "Creating..."
       },
       "Terminal": {
         "73768427cf": "Cerrar",
@@ -4012,7 +4052,8 @@
           "196c1b5362": "Abrir tareas de GitLab",
           "0ccba862b8": "Abrir tareas de GitHub",
           "fee535205b": "Tareas",
-          "d599269755": "Ocultar de la barra lateral"
+          "d599269755": "Ocultar de la barra lateral",
+          "gitee_open": "Open Gitee tasks"
         },
         "SidebarRepositoryFilterSection": {
           "d3a9c4cea1": "Limpiar",
@@ -6697,7 +6738,9 @@
           "dd67a1b6e1": "Muestra GitLab en el selector de fuentes de Tareas y en los accesos directos de la barra lateral.",
           "7c5d7fdc20": "GitLab",
           "1db47236cd": "Muestra GitHub en el selector de fuentes de Tareas y en los accesos directos de la barra lateral.",
-          "e14063e727": "GitHub"
+          "e14063e727": "GitHub",
+          "gitee_label": "Gitee",
+          "gitee_description": "Show Gitee in the Tasks source picker and sidebar shortcuts."
         },
         "TerminalAppearanceSection": {
           "a14a427ae4": "Grosor de la línea divisoria del panel.",
@@ -10267,6 +10310,33 @@
             "workspaceGone": "Couldn't open log — workspace is no longer available.",
             "notAuthorized": "Couldn't open log — path not authorized.",
             "alreadyEditable": "Log is already open for editing."
+          },
+          "createReviewBlocked": {
+            "dirty": "Create {{shortLabel}} failed: commit or discard local changes before creating a {{reviewLabel}}.",
+            "defaultBranch": "Create {{shortLabel}} failed: choose a feature branch before creating a {{reviewLabel}}.",
+            "noUpstream": "Create {{shortLabel}} failed: publish this branch before creating a {{reviewLabel}}.",
+            "needsPush": "Create {{shortLabel}} failed: push this branch before creating a {{reviewLabel}}.",
+            "needsSync": "Create {{shortLabel}} failed: sync this branch before creating a {{reviewLabel}}.",
+            "authRequired": "Create {{shortLabel}} failed: {{providerName}} is not authenticated. Next step: {{authInstruction}} in this environment.",
+            "authGitlab": "Run glab auth login",
+            "authAzureDevOps": "Set ORCA_AZURE_DEVOPS_TOKEN",
+            "authGitea": "Set ORCA_GITEA_TOKEN",
+            "authGitee": "Set ORCA_GITEE_TOKEN",
+            "authGitHub": "Run gh auth login"
+          },
+          "createReviewError": {
+            "switchBackToBranch": "Create {{shortLabel}} failed: switch back to the selected branch before creating a pull request.",
+            "dirty": "Create {{shortLabel}} failed: commit or discard local changes before creating a pull request.",
+            "defaultBranch": "Create {{shortLabel}} failed: choose a feature branch before creating a pull request.",
+            "noUpstream": "Create {{shortLabel}} failed: publish this branch before creating a pull request.",
+            "needsPush": "Create {{shortLabel}} failed: push this branch before creating a pull request.",
+            "needsSync": "Create {{shortLabel}} failed: sync this branch before creating a pull request.",
+            "detachedHead": "Create {{shortLabel}} failed: switch to a branch before creating a pull request.",
+            "refreshAndRetry": "Create {{shortLabel}} failed: refresh source control status and try again.",
+            "baseNotOnRemote": "Create {{shortLabel}} failed: the selected base branch has not been pushed to the remote. Choose a pushed base or push it first.",
+            "alreadyExists": "A pull request already exists for this branch.",
+            "notAuthenticated": "Create {{shortLabel}} failed: {{detail}}",
+            "genericWithDetail": "Create {{shortLabel}} failed: {{detail}}"
           }
         }
       },
@@ -12911,7 +12981,9 @@
       "taskSourceContextSummary": {
         "sourceUnavailable": "Origen {{value0}} no disponible: {{value1}}",
         "someSourceHostsUnavailable": "Algunos hosts de origen de {{value0}} no están disponibles: {{value1}}",
-        "reconnectOrUpdateTitle": "Reconecta o actualiza {{value0}} para cargar este origen."
+        "reconnectOrUpdateTitle": "Reconecta o actualiza {{value0}} para cargar este origen.",
+        "setGiteeToken": "{{value0}}. Set ORCA_GITEE_TOKEN.",
+        "setGiteeTokenTitle": "Set ORCA_GITEE_TOKEN in the source environment, then reload Gitee."
       },
       "ShortcutKeyCombo": {
         "07eb4985a1": "Doble toque en {{value0}}"

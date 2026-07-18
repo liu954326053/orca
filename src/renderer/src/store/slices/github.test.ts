@@ -4422,6 +4422,7 @@ describe('createGitHubSlice.fetchPRForBranch', () => {
       linkedGitHubPR: null,
       linkedGitLabMR: null,
       linkedGiteaPR: null,
+      linkedGiteePR: null,
       repoId,
       repoPath
     })

@@ -18,7 +18,9 @@ const KNOWN_NON_GITEA_HOSTS = new Set([
   'gitlab.com',
   'bitbucket.org',
   'dev.azure.com',
-  'ssh.dev.azure.com'
+  'ssh.dev.azure.com',
+  // Why: Gitee has a dedicated provider; never claim gitee.com as Gitea.
+  'gitee.com'
 ])
 const REPO_REF_CACHE_MAX_ENTRIES = 512
 const repoRefCache = new Map<string, GiteaRepoRef | null>()
@@ -84,6 +86,7 @@ function makeRepoRef(host: string, path: string, webOrigin: string): GiteaRepoRe
   if (
     !normalizedHost ||
     KNOWN_NON_GITEA_HOSTS.has(normalizedHost) ||
+    normalizedHost.endsWith('.gitee.com') ||
     normalizedHost.endsWith('.visualstudio.com')
   ) {
     return null

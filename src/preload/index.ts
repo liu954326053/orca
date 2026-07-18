@@ -5,6 +5,7 @@ import { contextBridge, ipcRenderer, webFrame, webUtils } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import { preloadE2EConfig } from './e2e-config'
 import { glApi } from './gitlab'
+import { giteeApi } from './gitee'
 import type { AppIdentity } from '../shared/app-identity'
 import type { CliInstallStatus } from '../shared/cli-install-types'
 import type { AgentHookInstallStatus } from '../shared/agent-hook-types'
@@ -1598,6 +1599,9 @@ const api = {
   // `gl.*` channel doesn't surface as a merge conflict on every
   // upstream sync of this central preload file.
   gl: glApi,
+
+  // Why: Gitee task-page bindings live in `./gitee` (same split pattern as gl).
+  gitee: giteeApi,
 
   linear: {
     connect: (args: {

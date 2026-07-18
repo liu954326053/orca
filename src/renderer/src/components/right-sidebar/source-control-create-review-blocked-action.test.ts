@@ -55,6 +55,20 @@ describe('source-control-create-review-blocked-action', () => {
     )
   })
 
+  it('uses the Gitee token name for blocked authentication', () => {
+    expect(
+      resolveBlockedCreateReviewNoticeMessage(
+        eligibility({
+          provider: 'gitee',
+          blockedReason: 'auth_required',
+          nextAction: 'authenticate'
+        })
+      )
+    ).toBe(
+      'Create PR failed: Gitee is not authenticated. Next step: Set ORCA_GITEE_TOKEN in this environment.'
+    )
+  })
+
   it('returns a push-first notice for supported needs-push clicks', () => {
     expect(resolveBlockedCreateReviewNoticeMessage(eligibility())).toBe(
       'Create PR failed: push this branch before creating a pull request.'

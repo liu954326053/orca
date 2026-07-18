@@ -223,6 +223,34 @@ describe('routeListingBranchSwitchesThroughGitIdentity', () => {
     expect(reconciled).toEqual(current)
   })
 
+  it('preserves a Gitee relink made while the listing request was in flight', () => {
+    const updateWorktreeGitIdentity = vi.fn()
+    const requestStarted = [
+      makeWorktree({ id: 'repo1::/path/wt1', linkedPR: 101, linkedGiteePR: 7 })
+    ]
+    const current = [makeWorktree({ id: 'repo1::/path/wt1', linkedPR: 101, linkedGiteePR: 8 })]
+
+    const reconciled = routeListingBranchSwitchesThroughGitIdentity({
+      requestStarted,
+      current,
+      incoming: [
+        makeWorktree({
+          id: 'repo1::/path/wt1',
+          branch: 'refs/heads/feature-two',
+          head: 'stale-head',
+          linkedPR: 101,
+          linkedGiteePR: 7
+        })
+      ],
+      matchesRefreshHost: matchesAnyHost,
+      hasBranchScopedReviewContext: hasLinkedPR,
+      updateWorktreeGitIdentity
+    })
+
+    expect(updateWorktreeGitIdentity).not.toHaveBeenCalled()
+    expect(reconciled).toEqual(current)
+  })
+
   it('fails closed when the same worktree id belongs to multiple execution hosts', () => {
     const updateWorktreeGitIdentity = vi.fn()
     const requestStarted = [

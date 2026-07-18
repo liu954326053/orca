@@ -85,6 +85,7 @@ function hasNonGitHubLinkedReview(worktree: Worktree): boolean {
     worktree.linkedGitLabMR != null ||
     worktree.linkedBitbucketPR != null ||
     worktree.linkedAzureDevOpsPR != null ||
-    worktree.linkedGiteaPR != null
+    worktree.linkedGiteaPR != null ||
+    worktree.linkedGiteePR != null
   )
 }

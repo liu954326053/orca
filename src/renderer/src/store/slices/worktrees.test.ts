@@ -2127,6 +2127,7 @@ describe('updateWorktreeGitIdentity', () => {
       linkedBitbucketPR: 103,
       linkedAzureDevOpsPR: 104,
       linkedGiteaPR: 105,
+      linkedGiteePR: 106,
       pushTarget: { remoteName: 'fork', branchName: 'old/review-head' }
     })
 
@@ -2143,6 +2144,7 @@ describe('updateWorktreeGitIdentity', () => {
       linkedBitbucketPR: null,
       linkedAzureDevOpsPR: null,
       linkedGiteaPR: null,
+      linkedGiteePR: null,
       pushTarget: undefined
     })
   })
@@ -2184,6 +2186,7 @@ describe('updateWorktreeGitIdentity', () => {
       linkedBitbucketPR: 103,
       linkedAzureDevOpsPR: 104,
       linkedGiteaPR: 105,
+      linkedGiteePR: 106,
       pushTarget: { remoteName: 'fork', branchName: 'old/review-head' }
     })
 
@@ -2202,6 +2205,7 @@ describe('updateWorktreeGitIdentity', () => {
         linkedBitbucketPR: null,
         linkedAzureDevOpsPR: null,
         linkedGiteaPR: null,
+        linkedGiteePR: null,
         pushTarget: undefined
       }
     })
@@ -2236,6 +2240,7 @@ describe('updateWorktreeGitIdentity', () => {
         linkedBitbucketPR: null,
         linkedAzureDevOpsPR: null,
         linkedGiteaPR: null,
+        linkedGiteePR: null,
         pushTarget: undefined
       }
     })
@@ -2260,7 +2265,8 @@ describe('updateWorktreeGitIdentity', () => {
         updates.linkedGitLabMR === null &&
         updates.linkedBitbucketPR === null &&
         updates.linkedAzureDevOpsPR === null &&
-        updates.linkedGiteaPR === null
+        updates.linkedGiteaPR === null &&
+        updates.linkedGiteePR === null
       ) {
         await clearPersisted
       }
@@ -2284,6 +2290,7 @@ describe('updateWorktreeGitIdentity', () => {
           linkedBitbucketPR: null,
           linkedAzureDevOpsPR: null,
           linkedGiteaPR: null,
+          linkedGiteePR: null,
           pushTarget: undefined
         }
       })
@@ -2332,6 +2339,7 @@ describe('updateWorktreeGitIdentity', () => {
           linkedBitbucketPR: null,
           linkedAzureDevOpsPR: null,
           linkedGiteaPR: null,
+          linkedGiteePR: null,
           pushTarget: nextPushTarget
         }
       })
@@ -2384,6 +2392,7 @@ describe('updateWorktreeGitIdentity', () => {
         linkedBitbucketPR: null,
         linkedAzureDevOpsPR: null,
         linkedGiteaPR: null,
+        linkedGiteePR: null,
         pushTarget: undefined
       }
     })
@@ -2445,6 +2454,7 @@ describe('updateWorktreeGitIdentity', () => {
         linkedBitbucketPR: null,
         linkedAzureDevOpsPR: null,
         linkedGiteaPR: null,
+        linkedGiteePR: null,
         pushTarget: undefined
       }
     })
@@ -2494,6 +2504,7 @@ describe('updateWorktreeGitIdentity', () => {
         linkedBitbucketPR: null,
         linkedAzureDevOpsPR: null,
         linkedGiteaPR: null,
+        linkedGiteePR: null,
         pushTarget: undefined
       }
     })
@@ -2534,6 +2545,7 @@ describe('updateWorktreeGitIdentity', () => {
           linkedBitbucketPR: null,
           linkedAzureDevOpsPR: null,
           linkedGiteaPR: null,
+          linkedGiteePR: null,
           pushTarget: undefined
         }
       })
@@ -2934,7 +2946,16 @@ describe('createWorktree base status merge', () => {
         undefined,
         undefined,
         undefined,
-        true
+        true,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        789
       )
 
     expect(mockApi.worktrees.create).toHaveBeenCalledWith(
@@ -2945,6 +2966,7 @@ describe('createWorktree base status merge', () => {
         linkedPR: 456,
         createdWithAgent: 'codex',
         linkedLinearIssue: 'ENG-123',
+        linkedGiteePR: 789,
         workspaceStatus: 'in-review',
         pendingFirstAgentMessageRename: true
       })
@@ -4547,6 +4569,7 @@ describe('worktree remote runtime mutations', () => {
       linkedBitbucketPR: null,
       linkedAzureDevOpsPR: null,
       linkedGiteaPR: null,
+      linkedGiteePR: null,
       force: true
     })
 
@@ -4567,6 +4590,46 @@ describe('worktree remote runtime mutations', () => {
       updates: { pushTarget: newPushTarget }
     })
     expect(store.getState().worktreesByRepo.repo1[0]?.pushTarget).toEqual(newPushTarget)
+  })
+
+  it('replaces a Gitea link with Gitee metadata and refreshes the Gitee hint', async () => {
+    const store = createTestStore()
+    const wt = makeWorktree({
+      id: 'repo1::/path/wt1',
+      repoId: 'repo1',
+      path: '/path/wt1',
+      branch: 'refs/heads/review-branch',
+      linkedGiteaPR: 21
+    })
+    const fetchHostedReviewForBranch = vi.fn().mockResolvedValue(null)
+    store.setState({
+      repos: [
+        { id: 'repo1', path: '/repo1', displayName: 'Repo 1', badgeColor: '#000', addedAt: 0 }
+      ],
+      worktreesByRepo: { repo1: [wt] },
+      fetchHostedReviewForBranch
+    } as Partial<AppState>)
+
+    await store.getState().updateWorktreeMeta(wt.id, { linkedGiteePR: 22 })
+
+    expect(mockApi.worktrees.updateMeta).toHaveBeenCalledWith({
+      worktreeId: wt.id,
+      updates: { linkedGiteePR: 22, linkedGiteaPR: null }
+    })
+    expect(store.getState().worktreesByRepo.repo1[0]).toMatchObject({
+      linkedGiteaPR: null,
+      linkedGiteePR: 22
+    })
+    expect(fetchHostedReviewForBranch).toHaveBeenCalledWith('/repo1', 'review-branch', {
+      repoId: 'repo1',
+      linkedGitHubPR: null,
+      linkedGitLabMR: null,
+      linkedBitbucketPR: null,
+      linkedAzureDevOpsPR: null,
+      linkedGiteaPR: null,
+      linkedGiteePR: 22,
+      force: true
+    })
   })
 
   it('resolves a manually linked GitHub PR through the worktree owner runtime', async () => {
@@ -5497,6 +5560,7 @@ describe('worktree remote runtime mutations', () => {
       linkedBitbucketPR: null,
       linkedAzureDevOpsPR: null,
       linkedGiteaPR: null,
+      linkedGiteePR: null,
       force: true
     })
   })
@@ -5529,6 +5593,7 @@ describe('worktree remote runtime mutations', () => {
       linkedBitbucketPR: null,
       linkedAzureDevOpsPR: null,
       linkedGiteaPR: null,
+      linkedGiteePR: null,
       force: true
     })
   })
@@ -7025,6 +7090,7 @@ describe('migrateWorktreeIdentity', () => {
           linkedBitbucketPR: null,
           linkedAzureDevOpsPR: null,
           linkedGiteaPR: null,
+          linkedGiteePR: null,
           pushTarget: undefined
         }
       })
@@ -7164,6 +7230,7 @@ describe('migrateWorktreeIdentity', () => {
           linkedBitbucketPR: null,
           linkedAzureDevOpsPR: null,
           linkedGiteaPR: null,
+          linkedGiteePR: null,
           pushTarget: undefined
         }
       })
@@ -7222,6 +7289,7 @@ describe('migrateWorktreeIdentity', () => {
           linkedBitbucketPR: null,
           linkedAzureDevOpsPR: null,
           linkedGiteaPR: null,
+          linkedGiteePR: null,
           pushTarget: undefined
         }
       })

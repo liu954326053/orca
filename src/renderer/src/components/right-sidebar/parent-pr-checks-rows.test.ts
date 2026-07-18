@@ -490,6 +490,40 @@ describe('buildParentPrChecksProjection', () => {
     })
   })
 
+  it('uses matching cached Gitee review details for a linked Gitee PR', () => {
+    const repo = makeRepo()
+    const worktree = makeWorktree({
+      id: 'repo-1::/feature',
+      linkedGiteePR: 13
+    })
+    const hostedKey = getHostedReviewCacheKey(repo.path, 'feature', settings, repo.id)
+
+    expect(
+      makeProjection({
+        worktree,
+        repo,
+        hostedReviewCache: {
+          [hostedKey]: {
+            data: makeReview({
+              provider: 'gitee',
+              number: 13,
+              title: 'Gitee review'
+            }),
+            fetchedAt: 2,
+            linkedReviewHintKey: 'gitee:13'
+          }
+        }
+      }).rows[0]
+    ).toMatchObject({
+      status: 'success',
+      provider: 'gitee',
+      reviewNumber: 13,
+      reviewLabel: '#13',
+      title: 'Gitee review',
+      hasLinkedReview: true
+    })
+  })
+
   it('does not use linked-hint hosted-review cache after a non-GitHub link is removed', () => {
     const repo = makeRepo()
     const worktree = makeWorktree({

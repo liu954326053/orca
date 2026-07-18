@@ -55,6 +55,7 @@ export function hasPositiveHostedReviewNumberLink(args: {
   linkedBitbucketPR?: number | null
   linkedAzureDevOpsPR?: number | null
   linkedGiteaPR?: number | null
+  linkedGiteePR?: number | null
 }): boolean {
   // Why: a linked review from any provider blocks unsafe pushes. Build on the
   // resolvable subset so the two helpers cannot drift — a resolvable link is by
@@ -63,7 +64,8 @@ export function hasPositiveHostedReviewNumberLink(args: {
     hasResolvableHostedReviewPushTargetLink(args) ||
     isPositiveHostedReviewNumber(args.linkedBitbucketPR) ||
     isPositiveHostedReviewNumber(args.linkedAzureDevOpsPR) ||
-    isPositiveHostedReviewNumber(args.linkedGiteaPR)
+    isPositiveHostedReviewNumber(args.linkedGiteaPR) ||
+    isPositiveHostedReviewNumber(args.linkedGiteePR)
   )
 }
 

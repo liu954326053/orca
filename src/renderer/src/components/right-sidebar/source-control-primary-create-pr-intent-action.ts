@@ -26,6 +26,7 @@ export function resolveProvisionalHostedReviewProvider(input: {
   linkedBitbucketPR?: number | null
   linkedAzureDevOpsPR?: number | null
   linkedGiteaPR?: number | null
+  linkedGiteePR?: number | null
 }): HostedReviewProvider {
   if (input.hostedReview?.provider && supportsHostedReviewCreation(input.hostedReview.provider)) {
     return input.hostedReview.provider
@@ -43,8 +44,8 @@ export function resolveProvisionalHostedReviewProvider(input: {
   if (input.linkedAzureDevOpsPR != null) {
     return 'azure-devops'
   }
-  if (input.linkedGiteaPR != null) {
-    return 'gitea'
+  if (input.linkedGiteaPR != null || input.linkedGiteePR != null) {
+    return input.linkedGiteaPR != null ? 'gitea' : 'gitee'
   }
   if (input.linkedGitHubPR != null || input.fallbackGitHubPR != null) {
     return 'github'

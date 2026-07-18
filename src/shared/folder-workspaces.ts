@@ -20,7 +20,8 @@ export function normalizeFolderWorkspaceLinkedTask(
     raw.provider !== 'github' &&
     raw.provider !== 'gitlab' &&
     raw.provider !== 'linear' &&
-    raw.provider !== 'jira'
+    raw.provider !== 'jira' &&
+    raw.provider !== 'gitee'
   ) {
     return null
   }
@@ -28,8 +29,10 @@ export function normalizeFolderWorkspaceLinkedTask(
     return null
   }
   if (
-    typeof raw.number !== 'number' ||
-    !Number.isFinite(raw.number) ||
+    !(
+      (typeof raw.number === 'number' && Number.isFinite(raw.number)) ||
+      (raw.provider === 'gitee' && typeof raw.number === 'string' && raw.number.trim().length > 0)
+    ) ||
     typeof raw.title !== 'string' ||
     raw.title.trim().length === 0 ||
     typeof raw.url !== 'string' ||
@@ -40,7 +43,7 @@ export function normalizeFolderWorkspaceLinkedTask(
   return {
     provider: raw.provider,
     type: raw.type,
-    number: raw.number,
+    number: typeof raw.number === 'string' ? raw.number.trim() : raw.number,
     title: raw.title.trim(),
     url: raw.url.trim(),
     ...(typeof raw.linearIdentifier === 'string' && raw.linearIdentifier.trim().length > 0

@@ -37,6 +37,8 @@ function getProviderLabel(provider: TaskSourceContext['provider']): string {
       return 'GitHub'
     case 'gitlab':
       return 'GitLab'
+    case 'gitee':
+      return 'Gitee'
     case 'linear':
       return 'Linear'
     case 'jira':

@@ -45,6 +45,11 @@ describe('resolveSourceControlManualReviewProvider', () => {
     ).toBe('gitea')
     expect(
       resolveSourceControlManualReviewProvider({
+        linkedGiteePR: 4
+      })
+    ).toBe('gitee')
+    expect(
+      resolveSourceControlManualReviewProvider({
         linkedGitHubPR: 42
       })
     ).toBe('github')
@@ -176,6 +181,42 @@ describe('buildSourceControlManualReviewUrl', () => {
         upstreamName: 'origin/feature/gitea'
       })
     ).toBe('https://gitea.company.test/team/orca/compare/main...feature/gitea')
+  })
+
+  it('builds a Gitee compare URL from a gitee.com remote', () => {
+    expect(
+      buildSourceControlManualReviewUrl({
+        baseRef: 'refs/remotes/origin/main',
+        branchName: 'feature/gitee',
+        repoRemoteName: 'origin',
+        repoRemoteUrl: 'git@gitee.com:team/orca.git',
+        upstreamName: 'origin/feature/gitee'
+      })
+    ).toBe('https://gitee.com/team/orca/compare/main...feature/gitee')
+  })
+
+  it('builds a Gitee compare URL from an SCP-style code.gitee.com remote', () => {
+    expect(
+      buildSourceControlManualReviewUrl({
+        baseRef: 'refs/remotes/origin/main',
+        branchName: 'feature/gitee',
+        repoRemoteName: 'origin',
+        repoRemoteUrl: 'git@code.gitee.com:team/orca.git',
+        upstreamName: 'origin/feature/gitee'
+      })
+    ).toBe('https://code.gitee.com/team/orca/compare/main...feature/gitee')
+  })
+
+  it('builds a Gitee compare URL from an HTTPS code.gitee.com remote', () => {
+    expect(
+      buildSourceControlManualReviewUrl({
+        baseRef: 'refs/remotes/origin/main',
+        branchName: 'feature/gitee',
+        repoRemoteName: 'origin',
+        repoRemoteUrl: 'https://code.gitee.com/team/orca.git',
+        upstreamName: 'origin/feature/gitee'
+      })
+    ).toBe('https://code.gitee.com/team/orca/compare/main...feature/gitee')
   })
 
   it('suppresses the link when the branch tracks a fork remote with no resolvable push URL', () => {

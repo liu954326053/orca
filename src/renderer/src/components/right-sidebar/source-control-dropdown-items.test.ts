@@ -708,7 +708,7 @@ describe('resolveDropdownItems', () => {
     expect(byKind.push_create_pr.disabled).toBe(false)
   })
 
-  it.each(['azure-devops', 'gitea'] as const)(
+  it.each(['azure-devops', 'gitea', 'gitee'] as const)(
     'enables push-before-PR recovery for %s review creation',
     (provider) => {
       const items = resolveDropdownItems(
@@ -737,7 +737,8 @@ describe('resolveDropdownItems', () => {
 
   it.each([
     ['azure-devops', 'Set ORCA_AZURE_DEVOPS_TOKEN in this environment'],
-    ['gitea', 'Set ORCA_GITEA_TOKEN in this environment']
+    ['gitea', 'Set ORCA_GITEA_TOKEN in this environment'],
+    ['gitee', 'Set ORCA_GITEE_TOKEN in this environment']
   ] as const)('uses token auth copy when %s PR creation needs authentication', (provider, hint) => {
     const items = resolveDropdownItems(
       inputs({

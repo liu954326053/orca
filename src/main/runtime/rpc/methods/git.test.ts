@@ -608,6 +608,38 @@ describe('git RPC methods', () => {
     )
   })
 
+  it('forwards the gitee provider to the runtime without rejecting it', async () => {
+    const runtime = {
+      getRuntimeId: () => 'test-runtime',
+      generateRuntimePullRequestFields: vi
+        .fn()
+        .mockResolvedValue({ success: true, fields: { title: 'Test', body: '', draft: false } })
+    } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: GIT_METHODS })
+
+    const response = await dispatcher.dispatch(
+      makeRequest('git.generatePullRequestFields', {
+        worktree: 'id:wt-1',
+        base: 'main',
+        title: '',
+        body: '',
+        draft: false,
+        provider: 'gitee',
+        useTemplate: false
+      })
+    )
+
+    expect(response.ok).toBe(true)
+    expect(runtime.generateRuntimePullRequestFields).toHaveBeenCalledWith('id:wt-1', {
+      base: 'main',
+      title: '',
+      body: '',
+      draft: false,
+      provider: 'gitee',
+      useTemplate: false
+    })
+  })
+
   it('rejects malformed commit-message settings before calling the runtime', async () => {
     const runtime = {
       getRuntimeId: () => 'test-runtime',

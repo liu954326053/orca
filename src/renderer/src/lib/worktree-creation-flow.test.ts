@@ -301,7 +301,8 @@ describe('runBackgroundWorktreeCreation', () => {
         },
         baseBranch: 'abc123',
         compareBaseRef: 'refs/remotes/origin/main',
-        linkedPR: 42
+        linkedPR: 42,
+        linkedGiteePR: 84
       })
     )
 
@@ -310,6 +311,7 @@ describe('runBackgroundWorktreeCreation', () => {
     expect(createCall[0]).toBe('repo-runtime')
     expect(createCall[2]).toBe('abc123')
     expect(createCall[24]).toBe('refs/remotes/origin/main')
+    expect(createCall[26]).toBe(84)
   })
 
   it('appends stderr provisioning events for the active VM recipe create', async () => {

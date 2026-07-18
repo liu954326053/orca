@@ -454,17 +454,20 @@ const WorktreeCard = React.memo(function WorktreeCard({
   const linkedBitbucketPR = worktree.linkedBitbucketPR ?? null
   const linkedAzureDevOpsPR = worktree.linkedAzureDevOpsPR ?? null
   const linkedGiteaPR = worktree.linkedGiteaPR ?? null
+  const linkedGiteePR = worktree.linkedGiteePR ?? null
   const hasNonGitHubLinkedReview =
     linkedGitLabMR !== null ||
     linkedBitbucketPR !== null ||
     linkedAzureDevOpsPR !== null ||
-    linkedGiteaPR !== null
+    linkedGiteaPR !== null ||
+    linkedGiteePR !== null
   const hasLinkedReview =
     linkedGitHubPR !== null ||
     linkedGitLabMR !== null ||
     linkedBitbucketPR !== null ||
     linkedAzureDevOpsPR !== null ||
-    linkedGiteaPR !== null
+    linkedGiteaPR !== null ||
+    linkedGiteePR !== null
   // Why: ChecksPanel can discover a branch PR before hosted-review metadata
   // warms, and transient older hosted-review misses can race with that cache.
   // A newer miss only yields to merged PR cache when the stored worktree head
@@ -511,6 +514,7 @@ const WorktreeCard = React.memo(function WorktreeCard({
     linkedBitbucketPR,
     linkedAzureDevOpsPR,
     linkedGiteaPR,
+    linkedGiteePR,
     {
       reviewHintKey:
         (useCachedBranchReview || cachedMergedBranchPRMatchesCurrentHead) && !hasLinkedReview
@@ -657,6 +661,7 @@ const WorktreeCard = React.memo(function WorktreeCard({
         linkedBitbucketPR,
         linkedAzureDevOpsPR,
         linkedGiteaPR,
+        linkedGiteePR,
         staleWhileRevalidate: true
       })
     }
@@ -677,6 +682,7 @@ const WorktreeCard = React.memo(function WorktreeCard({
     linkedBitbucketPR,
     linkedAzureDevOpsPR,
     linkedGiteaPR,
+    linkedGiteePR,
     fetchHostedReviewForBranch,
     branch,
     hostedReviewCacheKey,
@@ -710,6 +716,7 @@ const WorktreeCard = React.memo(function WorktreeCard({
       linkedBitbucketPR,
       linkedAzureDevOpsPR,
       linkedGiteaPR,
+      linkedGiteePR,
       staleWhileRevalidate: true
     })
   }, [
@@ -726,6 +733,7 @@ const WorktreeCard = React.memo(function WorktreeCard({
     linkedBitbucketPR,
     linkedAzureDevOpsPR,
     linkedGiteaPR,
+    linkedGiteePR,
     fetchHostedReviewForBranch,
     branch,
     hostedReviewCacheKey
@@ -1121,7 +1129,8 @@ const WorktreeCard = React.memo(function WorktreeCard({
     (hoverReview?.provider === 'gitlab' && linkedGitLabMR !== null) ||
     (hoverReview?.provider === 'bitbucket' && linkedBitbucketPR !== null) ||
     (hoverReview?.provider === 'azure-devops' && linkedAzureDevOpsPR !== null) ||
-    (hoverReview?.provider === 'gitea' && linkedGiteaPR !== null)
+    (hoverReview?.provider === 'gitea' && linkedGiteaPR !== null) ||
+    (hoverReview?.provider === 'gitee' && linkedGiteePR !== null)
   const handleUnlinkReview = useCallback(() => {
     switch (hoverReview?.provider) {
       case 'github':
@@ -1138,6 +1147,9 @@ const WorktreeCard = React.memo(function WorktreeCard({
         return
       case 'gitea':
         void updateWorktreeMeta(worktree.id, { linkedGiteaPR: null })
+        return
+      case 'gitee':
+        void updateWorktreeMeta(worktree.id, { linkedGiteePR: null })
         return
       case 'unsupported':
       case undefined:

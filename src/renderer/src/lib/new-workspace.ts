@@ -53,7 +53,13 @@ export const CLIENT_PLATFORM: NodeJS.Platform = navigator.userAgent.includes('Wi
     ? 'darwin'
     : 'linux'
 
-export { getLinkedWorkItemProvider, isGitLabIssueUrl } from './linked-work-item-provider'
+export {
+  getLinkedWorkItemProvider,
+  isGitLabIssueUrl,
+  isGiteeIssueUrl,
+  isGiteePullUrl,
+  isGiteeHostedUrl
+} from './linked-work-item-provider'
 
 export type LinkedWorkItemSummary = Omit<FolderWorkspaceLinkedTask, 'provider'> & {
   provider?: FolderWorkspaceLinkedTask['provider']
@@ -109,7 +115,7 @@ function getSetupConfigKind(
  */
 export function renderIssueCommandTemplate(
   template: string,
-  vars: { issueNumber: number | null; artifactUrl: string | null }
+  vars: { issueNumber: string | number | null; artifactUrl: string | null }
 ): string {
   const { issueNumber, artifactUrl } = vars
   let rendered = template

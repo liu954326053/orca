@@ -142,6 +142,7 @@ describe('hasPositiveHostedReviewNumberLink', () => {
     expect(hasPositiveHostedReviewNumberLink({ linkedBitbucketPR: 34 })).toBe(true)
     expect(hasPositiveHostedReviewNumberLink({ linkedAzureDevOpsPR: 56 })).toBe(true)
     expect(hasPositiveHostedReviewNumberLink({ linkedGiteaPR: 78 })).toBe(true)
+    expect(hasPositiveHostedReviewNumberLink({ linkedGiteePR: 90 })).toBe(true)
     expect(
       hasPositiveHostedReviewNumberLink({
         linkedGitHubPR: 0,
@@ -153,10 +154,15 @@ describe('hasPositiveHostedReviewNumberLink', () => {
   })
 
   it('blocks resolver-less providers without treating them as resolvable', () => {
-    // Bitbucket/Azure/Gitea have no push-target resolver yet, so they must block
+    // Bitbucket/Azure/Gitea/Gitee have no push-target resolver yet, so they must block
     // unsafe pushes but stay out of the resolvable subset. Locks the intended
     // relationship: resolvable ⊂ positive, so the two helpers cannot drift.
-    for (const provider of ['linkedBitbucketPR', 'linkedAzureDevOpsPR', 'linkedGiteaPR'] as const) {
+    for (const provider of [
+      'linkedBitbucketPR',
+      'linkedAzureDevOpsPR',
+      'linkedGiteaPR',
+      'linkedGiteePR'
+    ] as const) {
       const args = { [provider]: 42 }
       expect(hasPositiveHostedReviewNumberLink(args)).toBe(true)
       expect(hasResolvableHostedReviewPushTargetLink(args)).toBe(false)

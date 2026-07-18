@@ -4,7 +4,8 @@ import { i18n } from '@/i18n/i18n'
 import {
   getGitHubModeButtons,
   getGitHubTaskKindPresets,
-  getLinearPriorityLabel
+  getLinearPriorityLabel,
+  getSourceOptions
 } from './task-page-localized-options'
 
 describe('task-page-localized-options', () => {
@@ -54,5 +55,9 @@ describe('task-page-localized-options', () => {
     await i18n.changeLanguage('en')
 
     expect(getLinearPriorityLabel(0)).toBe('No priority')
+  })
+
+  it('exposes the Gitee task source with localized entry copy', () => {
+    expect(getSourceOptions().find((option) => option.id === 'gitee')?.label).toBe('Gitee')
   })
 })

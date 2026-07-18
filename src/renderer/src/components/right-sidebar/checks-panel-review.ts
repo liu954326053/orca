@@ -11,6 +11,7 @@ export type ChecksPanelReviewSelectionInput = {
   linkedBitbucketPR: number | null
   linkedAzureDevOpsPR: number | null
   linkedGiteaPR: number | null
+  linkedGiteePR: number | null
 }
 
 export function gitHubPRToChecksPanelReview(pr: PRInfo): ChecksPanelReview {
@@ -25,17 +26,28 @@ export function selectChecksPanelReview({
   linkedGitLabMR,
   linkedBitbucketPR,
   linkedAzureDevOpsPR,
-  linkedGiteaPR
+  linkedGiteaPR,
+  linkedGiteePR
 }: ChecksPanelReviewSelectionInput): ChecksPanelReview | null {
   const gitLabHostedReview = hostedReview?.provider === 'gitlab' ? hostedReview : null
   if (gitLabHostedReview) {
     return gitLabHostedReview
   }
+  const giteeHostedReview =
+    hostedReview?.provider === 'gitee' && hostedReview.number === linkedGiteePR
+      ? hostedReview
+      : null
+  if (giteeHostedReview) {
+    // Why: Gitee metadata is display-only; preserve its provider identity so
+    // mutation-capable consumers can reject it instead of treating it as GitHub.
+    return giteeHostedReview
+  }
   const hasNonGitHubLinkedReview =
     linkedGitLabMR !== null ||
     linkedBitbucketPR !== null ||
     linkedAzureDevOpsPR !== null ||
-    linkedGiteaPR !== null
+    linkedGiteaPR !== null ||
+    linkedGiteePR !== null
   if (hasNonGitHubLinkedReview) {
     return null
   }

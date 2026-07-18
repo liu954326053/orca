@@ -8,7 +8,7 @@ import {
 } from './execution-host'
 import type { GlobalSettings, ProjectProviderIdentity, Repo } from './types'
 
-export type TaskProvider = 'github' | 'gitlab' | 'linear' | 'jira'
+export type TaskProvider = 'github' | 'gitlab' | 'gitee' | 'linear' | 'jira'
 
 export type GitHubTaskProviderIdentity = ProjectProviderIdentity & {
   provider: 'github'
@@ -20,6 +20,15 @@ export type GitLabTaskProviderIdentity = {
   namespace?: string | null
   project?: string | null
   webUrl?: string | null
+}
+
+export type GiteeTaskProviderIdentity = {
+  provider: 'gitee'
+  // Why: host can be omitted when the repo ref is resolved at runtime from the
+  // remote URL; ProjectProviderIdentity stores only owner/repo.
+  host?: string | null
+  owner: string
+  repo: string
 }
 
 export type LinearTaskProviderIdentity = {
@@ -40,6 +49,7 @@ export type JiraTaskProviderIdentity = {
 export type TaskProviderIdentity =
   | GitHubTaskProviderIdentity
   | GitLabTaskProviderIdentity
+  | GiteeTaskProviderIdentity
   | LinearTaskProviderIdentity
   | JiraTaskProviderIdentity
 
@@ -180,6 +190,7 @@ function normalizeTaskProvider(value: string): TaskProvider | null {
   switch (value) {
     case 'github':
     case 'gitlab':
+    case 'gitee':
     case 'linear':
     case 'jira':
       return value
@@ -212,6 +223,8 @@ function providerIdentityCachePart(identity: TaskProviderIdentity | null | undef
       return [identity.owner, identity.repo].join('/')
     case 'gitlab':
       return identity.projectId ?? [identity.namespace, identity.project].filter(Boolean).join('/')
+    case 'gitee':
+      return [identity.host, identity.owner, identity.repo].join('/')
     case 'linear':
       return [identity.workspaceId, identity.teamId ?? identity.teamKey].filter(Boolean).join('/')
     case 'jira':

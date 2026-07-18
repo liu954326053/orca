@@ -39,6 +39,17 @@ const bitbucketReview: HostedReviewInfo = {
   mergeable: 'MERGEABLE'
 }
 
+const giteeReview: HostedReviewInfo = {
+  provider: 'gitee',
+  number: 246,
+  title: 'Ready Gitee PR',
+  state: 'open',
+  url: 'https://gitee.com/stablyai/orca/pulls/246',
+  status: 'success',
+  updatedAt: '2026-05-13T00:00:00.000Z',
+  mergeable: 'MERGEABLE'
+}
+
 describe('getWorktreeCardPrDisplay', () => {
   it('uses cached PR details when available', () => {
     expect(getWorktreeCardPrDisplay(pr, 123)).toBe(pr)
@@ -66,7 +77,7 @@ describe('getWorktreeCardPrDisplay', () => {
 
   it('ignores linked-lookup PR details when the worktree is unlinked', () => {
     expect(
-      getWorktreeCardPrDisplay(pr, null, null, null, null, null, {
+      getWorktreeCardPrDisplay(pr, null, null, null, null, null, null, {
         reviewHintKey: 'github:123'
       })
     ).toBeNull()
@@ -74,7 +85,7 @@ describe('getWorktreeCardPrDisplay', () => {
 
   it('shows branch-discovered GitHub PR details when the worktree is unlinked', () => {
     expect(
-      getWorktreeCardPrDisplay(pr, null, null, null, null, null, {
+      getWorktreeCardPrDisplay(pr, null, null, null, null, null, null, {
         reviewHintKey: ''
       })
     ).toBe(pr)
@@ -106,6 +117,20 @@ describe('getWorktreeCardPrDisplay', () => {
 
   it('preserves branch-discovered hosted reviews for providers without worktree metadata', () => {
     expect(getWorktreeCardPrDisplay(bitbucketReview, null)).toBe(bitbucketReview)
+  })
+
+  it('keeps a linked Gitee PR visible while details load', () => {
+    expect(getWorktreeCardPrDisplay(undefined, null, null, null, null, null, 246)).toEqual({
+      provider: 'gitee',
+      number: 246,
+      title: 'Loading PR...'
+    })
+  })
+
+  it('uses cached Gitee PR details when linked metadata matches', () => {
+    expect(getWorktreeCardPrDisplay(giteeReview, null, null, null, null, null, 246)).toBe(
+      giteeReview
+    )
   })
 })
 

@@ -2008,6 +2008,7 @@ describe('web worktree preload API', () => {
       name: 'review-pr-42',
       baseBranch: TEST_COMMIT_OID,
       compareBaseRef: 'refs/remotes/origin/main',
+      linkedGiteePR: 84,
       setupDecision: 'inherit',
       createdWithAgent: 'codex',
       startup: {
@@ -2043,6 +2044,7 @@ describe('web worktree preload API', () => {
           repo: 'repo-1',
           baseBranch: TEST_COMMIT_OID,
           compareBaseRef: 'refs/remotes/origin/main',
+          linkedGiteePR: 84,
           createdWithAgent: 'codex',
           startupCommand: "codex 'summarize repo'",
           startupEnv: { ORCA_AGENT_MODE: 'direct' },

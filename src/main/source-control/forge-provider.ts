@@ -21,6 +21,12 @@ import {
   getGiteaRepoSlug
 } from '../gitea/client'
 import { createGiteaPullRequest } from '../gitea/pull-request-creation'
+import {
+  getGiteePullRequest,
+  getGiteePullRequestForBranch,
+  getGiteeRepoSlug
+} from '../gitee/client'
+import { createGiteePullRequest } from '../gitee/pull-request-creation'
 import { createGitHubPullRequest, getPRForBranchOutcome, getRepoSlug } from '../github/client'
 import { getEnterpriseGitHubRepoSlug } from '../github/github-enterprise-repository'
 import { getMergeRequest, getMergeRequestForBranch, getProjectSlug } from '../gitlab/client'
@@ -29,6 +35,7 @@ import {
   mapAzureDevOpsReview,
   mapBitbucketReview,
   mapGiteaReview,
+  mapGiteeReview,
   mapGitHubReview,
   mapGitLabReview
 } from './forge-review-mappers'
@@ -54,9 +61,7 @@ export type ForgeReviewForBranchInput = ForgeProviderRepositoryContext & {
   githubCurrentHeadOid?: string | null
 }
 
-export type ForgeReviewByNumberInput = ForgeProviderRepositoryContext & {
-  number: number
-}
+export type ForgeReviewByNumberInput = ForgeProviderRepositoryContext & { number: number }
 
 export type ForgeProvider = {
   id: ForgeProviderId
@@ -72,13 +77,12 @@ export type ForgeProvider = {
   ): Promise<CreateHostedReviewResult>
 }
 
-function hostedReviewExecutionArgs(
+const hostedReviewExecutionArgs = (
   options: HostedReviewExecutionOptions
-): [] | [HostedReviewExecutionOptions] {
-  return hasHostedReviewLocalGitOptions(options)
+): [] | [HostedReviewExecutionOptions] =>
+  hasHostedReviewLocalGitOptions(options)
     ? [{ localGitExecOptions: getHostedReviewLocalGitOptions(options) }]
     : []
-}
 
 const gitLabForgeProvider = {
   id: 'gitlab',
@@ -239,6 +243,33 @@ const azureDevOpsForgeProvider = {
   createReview: createAzureDevOpsPullRequest
 } satisfies ForgeProvider
 
+const giteeForgeProvider = {
+  id: 'gitee',
+  supportsReviewCreation: true,
+  resolveRepository: (context) =>
+    getGiteeRepoSlug(context.repoPath, context.connectionId, ...hostedReviewExecutionArgs(context)),
+  async getReviewForBranch(input) {
+    const pr = await getGiteePullRequestForBranch(
+      input.repoPath,
+      input.branch,
+      input.linkedReviewNumber ?? null,
+      input.connectionId,
+      ...hostedReviewExecutionArgs(input)
+    )
+    return pr ? mapGiteeReview(pr) : null
+  },
+  async getReviewByNumber(input) {
+    const pr = await getGiteePullRequest(
+      input.repoPath,
+      input.number,
+      input.connectionId,
+      ...hostedReviewExecutionArgs(input)
+    )
+    return pr ? mapGiteeReview(pr) : null
+  },
+  createReview: createGiteePullRequest
+} satisfies ForgeProvider
+
 const giteaForgeProvider = {
   id: 'gitea',
   supportsReviewCreation: true,
@@ -266,19 +297,19 @@ const giteaForgeProvider = {
   createReview: createGiteaPullRequest
 } satisfies ForgeProvider
 
-// Why: provider order preserves existing branch-status behavior when remotes
-// could be interpreted by more than one hosting integration.
+// Why: provider order preserves branch-status behavior for ambiguous remotes.
+// Gitee must run before Gitea's catch-all so gitee.com is not misclassified.
 export const FORGE_PROVIDERS = [
   gitLabForgeProvider,
   gitHubForgeProvider,
   bitbucketForgeProvider,
   azureDevOpsForgeProvider,
+  giteeForgeProvider,
   giteaForgeProvider
 ] as const satisfies readonly ForgeProvider[]
 
-export function getForgeProviderById(id: ForgeProviderId): ForgeProvider {
-  return FORGE_PROVIDERS.find((provider) => provider.id === id) ?? gitHubForgeProvider
-}
+export const getForgeProviderById = (id: ForgeProviderId): ForgeProvider =>
+  FORGE_PROVIDERS.find((provider) => provider.id === id) ?? gitHubForgeProvider
 
 export async function getForgeProviderForRepository(
   context: ForgeProviderRepositoryContext
@@ -291,8 +322,7 @@ export async function getForgeProviderForRepository(
   return null
 }
 
-export async function detectHostedReviewProvider(
+export const detectHostedReviewProvider = async (
   context: ForgeProviderRepositoryContext
-): Promise<HostedReviewProvider> {
-  return (await getForgeProviderForRepository(context))?.id ?? 'unsupported'
-}
+): Promise<HostedReviewProvider> =>
+  (await getForgeProviderForRepository(context))?.id ?? 'unsupported'

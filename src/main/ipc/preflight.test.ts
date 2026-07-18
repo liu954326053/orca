@@ -12,6 +12,7 @@ const {
   getBitbucketAuthStatusMock,
   getAzureDevOpsAuthStatusMock,
   getGiteaAuthStatusMock,
+  getGiteeAuthStatusMock,
   resolveCliCommandsMock,
   mergePersistedWindowsPathMock
 } = vi.hoisted(() => ({
@@ -24,6 +25,7 @@ const {
   getBitbucketAuthStatusMock: vi.fn(),
   getAzureDevOpsAuthStatusMock: vi.fn(),
   getGiteaAuthStatusMock: vi.fn(),
+  getGiteeAuthStatusMock: vi.fn(),
   resolveCliCommandsMock: vi.fn(),
   mergePersistedWindowsPathMock: vi.fn()
 }))
@@ -73,6 +75,10 @@ vi.mock('../gitea/client', () => ({
   getGiteaAuthStatus: getGiteaAuthStatusMock
 }))
 
+vi.mock('../gitee/client', () => ({
+  getGiteeAuthStatus: getGiteeAuthStatusMock
+}))
+
 import {
   _resetPreflightCache,
   detectInstalledAgents,
@@ -101,6 +107,13 @@ describe('preflight', () => {
     baseUrl: null,
     tokenConfigured: false
   }
+  const defaultGiteeStatus = {
+    configured: false,
+    authenticated: false,
+    account: null,
+    baseUrl: null,
+    tokenConfigured: false
+  }
 
   beforeEach(() => {
     handleMock.mockReset()
@@ -112,6 +125,7 @@ describe('preflight', () => {
     getBitbucketAuthStatusMock.mockReset()
     getAzureDevOpsAuthStatusMock.mockReset()
     getGiteaAuthStatusMock.mockReset()
+    getGiteeAuthStatusMock.mockReset()
     mergePersistedWindowsPathMock.mockReset()
     // Why: existing tests should keep treating `which` as the only source
     // unless a case explicitly exercises the install-dir fallback.
@@ -122,6 +136,7 @@ describe('preflight', () => {
     getBitbucketAuthStatusMock.mockResolvedValue(defaultBitbucketStatus)
     getAzureDevOpsAuthStatusMock.mockResolvedValue(defaultAzureDevOpsStatus)
     getGiteaAuthStatusMock.mockResolvedValue(defaultGiteaStatus)
+    getGiteeAuthStatusMock.mockResolvedValue(defaultGiteeStatus)
     _resetPreflightCache()
     Object.defineProperty(process, 'platform', {
       configurable: true,
@@ -163,7 +178,8 @@ describe('preflight', () => {
       glab: { installed: true, authenticated: true },
       bitbucket: defaultBitbucketStatus,
       azureDevOps: defaultAzureDevOpsStatus,
-      gitea: defaultGiteaStatus
+      gitea: defaultGiteaStatus,
+      gitee: defaultGiteeStatus
     })
     expect(execFileAsyncMock).toHaveBeenNthCalledWith(4, 'gh', ['auth', 'status'], {
       encoding: 'utf-8',
@@ -430,7 +446,8 @@ describe('preflight', () => {
       glab: { installed: true, authenticated: true },
       bitbucket: defaultBitbucketStatus,
       azureDevOps: defaultAzureDevOpsStatus,
-      gitea: defaultGiteaStatus
+      gitea: defaultGiteaStatus,
+      gitee: defaultGiteeStatus
     })
   })
 
@@ -458,7 +475,8 @@ describe('preflight', () => {
       glab: { installed: true, authenticated: true },
       bitbucket: defaultBitbucketStatus,
       azureDevOps: defaultAzureDevOpsStatus,
-      gitea: defaultGiteaStatus
+      gitea: defaultGiteaStatus,
+      gitee: defaultGiteeStatus
     })
     expect(refreshedStatus).toEqual({
       git: { installed: true },
@@ -466,7 +484,8 @@ describe('preflight', () => {
       glab: { installed: true, authenticated: true },
       bitbucket: defaultBitbucketStatus,
       azureDevOps: defaultAzureDevOpsStatus,
-      gitea: defaultGiteaStatus
+      gitea: defaultGiteaStatus,
+      gitee: defaultGiteeStatus
     })
   })
 

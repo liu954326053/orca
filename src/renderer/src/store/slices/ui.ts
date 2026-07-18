@@ -717,7 +717,7 @@ export type UISlice = {
     attachments: string[]
     linkedWorkItem: {
       type: 'issue' | 'pr' | 'mr'
-      number: number
+      number: string | number
       title: string
       url: string
       linearIdentifier?: string
@@ -733,6 +733,9 @@ export type UISlice = {
      *  drafts saved before GitLab support keep loading without migration. */
     linkedGitLabIssue?: number | null
     linkedGitLabMR?: number | null
+    /** Gitee parallels — issue number or pull-request number. Optional for older drafts. */
+    linkedGiteeIssue?: string | number | null
+    linkedGiteePR?: number | null
     // Why: repo-scoped start ref selected via the "Start from" picker.
     // Absent means "use the repo's effective base ref".
     baseBranch?: string

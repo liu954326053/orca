@@ -61,6 +61,19 @@ function makeGitLabReview(): HostedReviewInfo {
   }
 }
 
+function makeGiteeReview(): HostedReviewInfo {
+  return {
+    provider: 'gitee',
+    number: 61,
+    title: 'Search worktrees by Gitee pull request',
+    state: 'open',
+    url: 'https://gitee.com/acme/orca/pulls/61',
+    status: 'pending',
+    updatedAt: '2026-07-17T00:00:00Z',
+    mergeable: 'UNKNOWN'
+  }
+}
+
 describe('buildWorktreeChecksReviewIndex', () => {
   it('reads the same host-scoped GitHub PR cache entry as Checks', () => {
     const key = getGitHubPRCacheKey(
@@ -119,6 +132,44 @@ describe('buildWorktreeChecksReviewIndex', () => {
     })
 
     expect(reviews.get(gitLabWorktree)).toBe(gitLabReview)
+  })
+
+  it('indexes matching Gitee review metadata instead of an authoritative null', () => {
+    const giteeWorktree = { ...worktree, linkedGiteePR: 61 }
+    const prKey = getGitHubPRCacheKey(
+      repo.path,
+      repo.id,
+      'feature/search',
+      null,
+      repo.connectionId,
+      repo.executionHostId,
+      true
+    )
+    const reviewKey = getHostedReviewCacheKey(
+      repo.path,
+      'feature/search',
+      null,
+      repo.id,
+      repo.connectionId,
+      repo.executionHostId,
+      true
+    )
+    const giteeReview = makeGiteeReview()
+
+    const reviews = buildWorktreeChecksReviewIndex({
+      worktrees: [giteeWorktree],
+      repoByHostIdentity: new Map([[getRepoHostIdentity(repo), repo]]),
+      prCache: { [prKey]: { data: makePR(), fetchedAt: 1 } },
+      hostedReviewCache: { [reviewKey]: { data: giteeReview, fetchedAt: 1 } },
+      settings: null
+    })
+
+    expect(reviews.get(giteeWorktree)).toBe(giteeReview)
+    expect(reviews.get(giteeWorktree)).toMatchObject({
+      provider: 'gitee',
+      number: 61,
+      title: 'Search worktrees by Gitee pull request'
+    })
   })
 
   it('records when a non-GitHub link suppresses stale GitHub metadata before its review loads', () => {

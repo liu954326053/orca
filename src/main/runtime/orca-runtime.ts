@@ -1603,6 +1603,8 @@ function mergeRuntimeFolderWorkspace(repo: Repo, worktreeId: string, meta: Workt
     linkedBitbucketPR: meta.linkedBitbucketPR ?? null,
     linkedAzureDevOpsPR: meta.linkedAzureDevOpsPR ?? null,
     linkedGiteaPR: meta.linkedGiteaPR ?? null,
+    linkedGiteePR: meta.linkedGiteePR ?? null,
+    linkedGiteeIssue: meta.linkedGiteeIssue ?? null,
     isArchived: meta.isArchived ?? false,
     isUnread: meta.isUnread ?? false,
     isPinned: meta.isPinned ?? false,
@@ -1782,6 +1784,7 @@ type SelectedReviewBranchInput = {
   linkedBitbucketPR?: number | null
   linkedAzureDevOpsPR?: number | null
   linkedGiteaPR?: number | null
+  linkedGiteePR?: number | null
   pushTarget?: GitPushTarget
 }
 
@@ -1802,6 +1805,11 @@ function getSelectedReviewBranch(args: SelectedReviewBranchInput): SelectedRevie
   }
   if (typeof args.linkedAzureDevOpsPR === 'number') {
     return { provider: 'azure-devops', number: args.linkedAzureDevOpsPR }
+  }
+  // Why: forge detection checks Gitee before Gitea's catch-all, so stale dual
+  // links must use the same priority when choosing the review branch.
+  if (typeof args.linkedGiteePR === 'number') {
+    return { provider: 'gitee', number: args.linkedGiteePR }
   }
   if (typeof args.linkedGiteaPR === 'number') {
     return { provider: 'gitea', number: args.linkedGiteaPR }
@@ -1853,13 +1861,15 @@ function getSelectedReviewLookupHints(args: SelectedReviewBranchInput): {
   linkedBitbucketPR?: number | null
   linkedAzureDevOpsPR?: number | null
   linkedGiteaPR?: number | null
+  linkedGiteePR?: number | null
 } {
   return {
     linkedGitHubPR: args.linkedPR ?? null,
     linkedGitLabMR: args.linkedGitLabMR ?? null,
     linkedBitbucketPR: args.linkedBitbucketPR ?? null,
     linkedAzureDevOpsPR: args.linkedAzureDevOpsPR ?? null,
-    linkedGiteaPR: args.linkedGiteaPR ?? null
+    linkedGiteaPR: args.linkedGiteaPR ?? null,
+    linkedGiteePR: args.linkedGiteePR ?? null
   }
 }
 
@@ -13591,6 +13601,7 @@ export class OrcaRuntimeService {
     linkedBitbucketPR?: number | null
     linkedAzureDevOpsPR?: number | null
     linkedGiteaPR?: number | null
+    linkedGiteePR?: number | null
   }): Promise<HostedReviewInfo | null> {
     const repo = await this.resolveRepoSelector(args.repoSelector)
     const executionOptions = this.getHostedReviewExecutionOptions(repo)
@@ -13605,6 +13616,7 @@ export class OrcaRuntimeService {
       linkedBitbucketPR: args.linkedBitbucketPR ?? null,
       linkedAzureDevOpsPR: args.linkedAzureDevOpsPR ?? null,
       linkedGiteaPR: args.linkedGiteaPR ?? null,
+      linkedGiteePR: args.linkedGiteePR ?? null,
       ...executionOptions
     })
     if (review?.provider === 'github' && this.stats && !this.stats.hasCountedPR(review.url)) {
@@ -13641,6 +13653,7 @@ export class OrcaRuntimeService {
       linkedBitbucketPR: args.linkedBitbucketPR ?? null,
       linkedAzureDevOpsPR: args.linkedAzureDevOpsPR ?? null,
       linkedGiteaPR: args.linkedGiteaPR ?? null,
+      linkedGiteePR: args.linkedGiteePR ?? null,
       ...executionOptions
     })
   }
@@ -15502,6 +15515,8 @@ export class OrcaRuntimeService {
     linkedBitbucketPR?: number | null
     linkedAzureDevOpsPR?: number | null
     linkedGiteaPR?: number | null
+    linkedGiteePR?: number | null
+    linkedGiteeIssue?: number | null
     comment?: string
     displayName?: string
     telemetrySource?: WorkspaceCreateTelemetrySource
@@ -15599,6 +15614,10 @@ export class OrcaRuntimeService {
           ? { linkedAzureDevOpsPR: args.linkedAzureDevOpsPR }
           : {}),
         ...(args.linkedGiteaPR !== undefined ? { linkedGiteaPR: args.linkedGiteaPR } : {}),
+        ...(args.linkedGiteePR !== undefined ? { linkedGiteePR: args.linkedGiteePR } : {}),
+        ...(args.linkedGiteeIssue !== undefined
+          ? { linkedGiteeIssue: args.linkedGiteeIssue }
+          : {}),
         ...(effectiveCreatedWithAgent ? { createdWithAgent: effectiveCreatedWithAgent } : {}),
         ...(args.comment !== undefined ? { comment: args.comment } : {}),
         ...(args.manualOrder !== undefined ? { manualOrder: args.manualOrder } : {}),
@@ -16176,6 +16195,8 @@ export class OrcaRuntimeService {
         ? { linkedAzureDevOpsPR: args.linkedAzureDevOpsPR }
         : {}),
       ...(args.linkedGiteaPR !== undefined ? { linkedGiteaPR: args.linkedGiteaPR } : {}),
+      ...(args.linkedGiteePR !== undefined ? { linkedGiteePR: args.linkedGiteePR } : {}),
+      ...(args.linkedGiteeIssue !== undefined ? { linkedGiteeIssue: args.linkedGiteeIssue } : {}),
       ...(effectiveCreatedWithAgent ? { createdWithAgent: effectiveCreatedWithAgent } : {}),
       ...(args.pendingFirstAgentMessageRename === true && effectiveCreatedWithAgent
         ? { pendingFirstAgentMessageRename: true }
@@ -16493,6 +16514,8 @@ export class OrcaRuntimeService {
       linkedBitbucketPR?: number | null
       linkedAzureDevOpsPR?: number | null
       linkedGiteaPR?: number | null
+      linkedGiteePR?: number | null
+      linkedGiteeIssue?: number | null
       comment?: string
       displayName?: string
       workspaceStatus?: string
@@ -16548,7 +16571,13 @@ export class OrcaRuntimeService {
         ...(args.linkedAzureDevOpsPR != null
           ? { linkedAzureDevOpsPR: args.linkedAzureDevOpsPR }
           : {}),
-        ...(args.linkedGiteaPR != null ? { linkedGiteaPR: args.linkedGiteaPR } : {}),
+        // Why: explicit nulls clear stale review links when an SSH worktree id
+        // is reused; only omitted fields should preserve existing metadata.
+        ...(args.linkedGiteaPR !== undefined ? { linkedGiteaPR: args.linkedGiteaPR } : {}),
+        ...(args.linkedGiteePR !== undefined ? { linkedGiteePR: args.linkedGiteePR } : {}),
+        ...(args.linkedGiteeIssue !== undefined
+          ? { linkedGiteeIssue: args.linkedGiteeIssue }
+          : {}),
         ...(args.pushTarget ? { pushTarget: args.pushTarget } : {}),
         ...(args.workspaceStatus ? { workspaceStatus: args.workspaceStatus as never } : {}),
         ...(args.manualOrder !== undefined ? { manualOrder: args.manualOrder } : {}),

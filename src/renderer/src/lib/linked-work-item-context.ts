@@ -204,7 +204,7 @@ export function resolveQuickCreateLinkedWorkItemPrompt(
     | (Pick<
         {
           provider?: TaskProvider
-          number: number
+          number: string | number
           url: string
           title?: string
           linearIdentifier?: string

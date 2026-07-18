@@ -47,18 +47,41 @@ describe('folderWorkspaceToWorktree', () => {
         }
       })
     )
+    const giteeIssue = folderWorkspaceToWorktree(
+      makeFolderWorkspace({
+        linkedTask: {
+          provider: 'gitee',
+          type: 'issue',
+          number: 'IK1X2N',
+          title: 'Gitee refund fails',
+          url: 'https://gitee.com/acme/app/issues/IK1X2N'
+        }
+      })
+    )
 
     expect(githubIssue).toMatchObject({
       linkedIssue: 42,
       linkedPR: null,
       linkedGitLabMR: null,
-      linkedGitLabIssue: null
+      linkedGitLabIssue: null,
+      linkedGiteePR: null,
+      linkedGiteeIssue: null
     })
     expect(gitlabIssue).toMatchObject({
       linkedIssue: null,
       linkedPR: null,
       linkedGitLabMR: null,
-      linkedGitLabIssue: 7
+      linkedGitLabIssue: 7,
+      linkedGiteePR: null,
+      linkedGiteeIssue: null
+    })
+    expect(giteeIssue).toMatchObject({
+      linkedIssue: null,
+      linkedPR: null,
+      linkedGitLabMR: null,
+      linkedGitLabIssue: null,
+      linkedGiteePR: null,
+      linkedGiteeIssue: 'IK1X2N'
     })
   })
 
@@ -123,6 +146,8 @@ describe('folderWorkspaceToWorktree', () => {
 
     expect(githubPr.linkedPR).toBeNull()
     expect(githubPr.linkedIssue).toBeNull()
+    expect(githubPr.linkedGiteaPR).toBeNull()
+    expect(githubPr.linkedGiteePR).toBeNull()
     expect(gitlabMr.linkedGitLabMR).toBeNull()
     expect(gitlabMr.linkedGitLabIssue).toBeNull()
   })

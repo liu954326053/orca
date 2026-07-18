@@ -57,6 +57,9 @@ function providerForHost(host: string): ManualReviewProvider | null {
   if (normalized === 'bitbucket.org') {
     return 'bitbucket'
   }
+  if (normalized === 'gitee.com' || normalized.endsWith('.gitee.com')) {
+    return 'gitee'
+  }
   if (
     normalized === 'dev.azure.com' ||
     normalized === 'ssh.dev.azure.com' ||

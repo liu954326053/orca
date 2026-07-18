@@ -128,6 +128,8 @@ import type {
   MRInfo,
   MRListState,
   ListWorkItemsResult,
+  CheckStatus,
+  PRMergeableState,
   IssueInfo,
   JiraComment,
   JiraConnectionStatus,
@@ -617,6 +619,15 @@ export type PreflightStatus = {
     tokenConfigured: boolean
   }
   gitea?: {
+    configured: boolean
+    authenticated: boolean
+    account: string | null
+    baseUrl: string | null
+    tokenConfigured: boolean
+  }
+  // Why: optional so existing preflight payloads without Gitee support keep
+  // typechecking. Consumers gate on `gitee?.tokenConfigured`.
+  gitee?: {
     configured: boolean
     authenticated: boolean
     account: string | null
@@ -1909,6 +1920,134 @@ export type PreloadApi = {
         type: 'issue' | 'mr'
       }
     ) => Promise<Omit<GitLabWorkItem, 'repoId'> | null>
+  }
+  // ── Gitee — task-page issues/PRs + auth status (token never exposed) ──
+  gitee: {
+    authStatus: () => Promise<{
+      configured: boolean
+      authenticated: boolean
+      account: string | null
+      baseUrl: string | null
+      tokenConfigured: boolean
+    }>
+    repoSlug: (args: {
+      repoPath: string
+      repoId?: string | null
+      sourceContext?: TaskSourceContext | null
+    }) => Promise<{
+      host: string
+      owner: string
+      repo: string
+      apiBaseUrl: string
+      webBaseUrl: string
+    } | null>
+    listIssues: (args: {
+      repoPath: string
+      repoId?: string | null
+      sourceContext?: TaskSourceContext | null
+      state?: 'open' | 'closed' | 'progressing' | 'rejected' | 'all'
+      page?: number
+      perPage?: number
+      limit?: number
+      q?: string
+      creator?: string
+      assignee?: string
+      labels?: string[]
+    }) => Promise<{
+      items: Array<{
+        number: string
+        title: string
+        state: 'open' | 'closed' | 'progressing' | 'rejected'
+        url: string
+        labels: string[]
+        body: string
+        updatedAt: string
+        author: string | null
+      }>
+      error?: { type: string; message: string }
+    }>
+    getIssue: (args: {
+      repoPath: string
+      repoId?: string | null
+      sourceContext?: TaskSourceContext | null
+      number: string | number
+    }) => Promise<{
+      number: string
+      title: string
+      state: 'open' | 'closed' | 'progressing' | 'rejected'
+      url: string
+      labels: string[]
+      body: string
+      updatedAt: string
+      author: string | null
+      comments: Array<{
+        id: number
+        body: string
+        author: string | null
+        createdAt: string
+        updatedAt: string
+      }>
+    } | null>
+    listPulls: (args: {
+      repoPath: string
+      repoId?: string | null
+      sourceContext?: TaskSourceContext | null
+      state?: 'open' | 'closed' | 'all'
+      page?: number
+      perPage?: number
+    }) => Promise<{
+      items: Array<{
+        number: number
+        title: string
+        state: 'open' | 'closed' | 'merged' | 'draft'
+        url: string
+        status: CheckStatus
+        updatedAt: string
+        mergeable: PRMergeableState
+        headSha?: string
+      }>
+      error?: { type: string; message: string }
+    }>
+    createIssue: (args: {
+      repoPath: string
+      repoId?: string | null
+      sourceContext?: TaskSourceContext | null
+      title: string
+      body?: string
+      labels?: string[]
+    }) => Promise<
+      { ok: true; number: string | number; url: string } | { ok: false; error: string }
+    >
+    updateIssue: (args: {
+      repoPath: string
+      repoId?: string | null
+      sourceContext?: TaskSourceContext | null
+      number: string | number
+      updates: {
+        title?: string
+        body?: string
+        state?: 'open' | 'closed'
+      }
+    }) => Promise<{ ok: true } | { ok: false; error: string }>
+    addIssueComment: (args: {
+      repoPath: string
+      repoId?: string | null
+      sourceContext?: TaskSourceContext | null
+      number: string | number
+      body: string
+    }) => Promise<
+      | {
+          ok: true
+          comment: {
+            id: number
+            body: string
+            author: string | null
+            createdAt: string
+            updatedAt: string
+          }
+        }
+      | { ok: false; error: string }
+    >
   }
   linear: {
     connect: (args: {

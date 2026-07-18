@@ -30,6 +30,20 @@ function makeGitLabReview(overrides: Partial<HostedReviewInfo> = {}): HostedRevi
   }
 }
 
+function makeGiteeReview(overrides: Partial<HostedReviewInfo> = {}): HostedReviewInfo {
+  return {
+    provider: 'gitee',
+    number: 18,
+    title: 'Gitee pull request',
+    state: 'open',
+    url: 'https://gitee.com/acme/widgets/pulls/18',
+    status: 'pending',
+    updatedAt: '2026-07-17T00:00:00Z',
+    mergeable: 'UNKNOWN',
+    ...overrides
+  }
+}
+
 describe('gitHubPRToChecksPanelReview', () => {
   // Why: the right-sidebar merge presenter reads these fields off the converted
   // review object. PR #4001 dropped them here, so review-required/merge-queue
@@ -72,7 +86,27 @@ describe('selectChecksPanelReview', () => {
         linkedGitLabMR: 34,
         linkedBitbucketPR: null,
         linkedAzureDevOpsPR: null,
-        linkedGiteaPR: null
+        linkedGiteaPR: null,
+        linkedGiteePR: null
+      })
+    ).toBe(review)
+  })
+
+  it('uses matching Gitee hosted review metadata ahead of GitHub PR cache', () => {
+    const review = makeGiteeReview({
+      number: 61,
+      url: 'https://gitee.com/acme/widgets/pulls/61'
+    })
+
+    expect(
+      selectChecksPanelReview({
+        hostedReview: review,
+        pr: makePR({ number: 12 }),
+        linkedGitLabMR: null,
+        linkedBitbucketPR: null,
+        linkedAzureDevOpsPR: null,
+        linkedGiteaPR: null,
+        linkedGiteePR: 61
       })
     ).toBe(review)
   })
@@ -84,7 +118,8 @@ describe('selectChecksPanelReview', () => {
       linkedGitLabMR: null,
       linkedBitbucketPR: null,
       linkedAzureDevOpsPR: null,
-      linkedGiteaPR: null
+      linkedGiteaPR: null,
+      linkedGiteePR: null
     })
 
     expect(selected).toMatchObject({ provider: 'github', number: 12, state: 'merged' })
@@ -94,7 +129,8 @@ describe('selectChecksPanelReview', () => {
     { provider: 'GitLab', linkedGitLabMR: 7 },
     { provider: 'Bitbucket', linkedBitbucketPR: 8 },
     { provider: 'Azure DevOps', linkedAzureDevOpsPR: 9 },
-    { provider: 'Gitea', linkedGiteaPR: 10 }
+    { provider: 'Gitea', linkedGiteaPR: 10 },
+    { provider: 'Gitee', linkedGiteePR: 11 }
   ])('does not surface GitHub PR cache when a $provider review is linked', (links) => {
     expect(
       selectChecksPanelReview({
@@ -103,7 +139,8 @@ describe('selectChecksPanelReview', () => {
         linkedGitLabMR: links.linkedGitLabMR ?? null,
         linkedBitbucketPR: links.linkedBitbucketPR ?? null,
         linkedAzureDevOpsPR: links.linkedAzureDevOpsPR ?? null,
-        linkedGiteaPR: links.linkedGiteaPR ?? null
+        linkedGiteaPR: links.linkedGiteaPR ?? null,
+        linkedGiteePR: links.linkedGiteePR ?? null
       })
     ).toBeNull()
   })

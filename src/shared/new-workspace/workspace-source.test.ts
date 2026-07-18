@@ -64,4 +64,29 @@ describe('workspace source policy', () => {
       shouldApplyWorkspaceSourceAutoName({ currentName: 'my workspace', lastAutoName: 'old' })
     ).toBe(false)
   })
+
+  it('infers Gitee issue/PR sources without colliding with GitHub', () => {
+    const issue = {
+      type: 'issue' as const,
+      number: 15,
+      title: 'Gitee issue',
+      url: 'https://gitee.com/acme/app/issues/15'
+    }
+    const pull = {
+      type: 'pr' as const,
+      number: 3,
+      title: 'Gitee PR',
+      url: 'https://gitee.com/acme/app/pulls/3'
+    }
+    expect(getWorkspaceSourceProvider(issue)).toBe('gitee')
+    expect(getWorkspaceSourceProvider(pull)).toBe('gitee')
+    expect(buildWorkspaceSourceSelection({ linkedWorkItem: issue })).toMatchObject({
+      kind: 'gitee-issue',
+      label: '#15 Gitee issue'
+    })
+    expect(buildWorkspaceSourceSelection({ linkedWorkItem: pull })).toMatchObject({
+      kind: 'gitee-pr',
+      label: '#3 Gitee PR'
+    })
+  })
 })

@@ -20,6 +20,8 @@ function reviewLinkForProvider(
       return { linkedReviewNumber: input.linkedAzureDevOpsPR ?? null }
     case 'gitea':
       return { linkedReviewNumber: input.linkedGiteaPR ?? null }
+    case 'gitee':
+      return { linkedReviewNumber: input.linkedGiteePR ?? null }
   }
 }
 
@@ -34,10 +36,15 @@ export async function getHostedReviewForBranch(
     linkedBitbucketPR?: number | null
     linkedAzureDevOpsPR?: number | null
     linkedGiteaPR?: number | null
+    linkedGiteePR?: number | null
     currentHeadOid?: string | null
   } & HostedReviewExecutionOptions
 ): Promise<HostedReviewInfo | null> {
-  const branchName = input.branch.replace(/^refs\/heads\//, '')
+  // Why: a literal `HEAD` is a detached checkout, not a branch named HEAD.
+  // Normalize it to an empty branch so it takes the same path as an empty ref:
+  // no blind branch probe, but provider-specific exact ids still resolve.
+  const strippedBranch = input.branch.replace(/^refs\/heads\//, '')
+  const branchName = strippedBranch === 'HEAD' ? '' : strippedBranch
   // Why: detached HEAD cannot use branch lookup, but provider-specific exact
   // ids can still resolve the review without probing an empty branch name.
   if (
@@ -47,7 +54,8 @@ export async function getHostedReviewForBranch(
     input.linkedGitLabMR == null &&
     input.linkedBitbucketPR == null &&
     input.linkedAzureDevOpsPR == null &&
-    input.linkedGiteaPR == null
+    input.linkedGiteaPR == null &&
+    input.linkedGiteePR == null
   ) {
     return null
   }

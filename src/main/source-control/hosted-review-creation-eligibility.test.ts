@@ -5,13 +5,16 @@ const {
   createGitLabMergeRequestMock,
   createAzureDevOpsPullRequestMock,
   createGiteaPullRequestMock,
+  createGiteePullRequestMock,
   isAzureDevOpsReviewCreationAuthenticatedMock,
   isGiteaReviewCreationAuthenticatedMock,
+  isGiteeReviewCreationAuthenticatedMock,
   getRepoSlugMock,
   getProjectSlugMock,
   getBitbucketRepoSlugMock,
   getAzureDevOpsRepoSlugMock,
   getGiteaRepoSlugMock,
+  getGiteeRepoSlugMock,
   getHostedReviewForBranchMock,
   ghExecFileAsyncMock,
   glabExecFileAsyncMock,
@@ -24,13 +27,16 @@ const {
   createGitLabMergeRequestMock: vi.fn(),
   createAzureDevOpsPullRequestMock: vi.fn(),
   createGiteaPullRequestMock: vi.fn(),
+  createGiteePullRequestMock: vi.fn(),
   isAzureDevOpsReviewCreationAuthenticatedMock: vi.fn(),
   isGiteaReviewCreationAuthenticatedMock: vi.fn(),
+  isGiteeReviewCreationAuthenticatedMock: vi.fn(),
   getRepoSlugMock: vi.fn(),
   getProjectSlugMock: vi.fn(),
   getBitbucketRepoSlugMock: vi.fn(),
   getAzureDevOpsRepoSlugMock: vi.fn(),
   getGiteaRepoSlugMock: vi.fn(),
+  getGiteeRepoSlugMock: vi.fn(),
   getHostedReviewForBranchMock: vi.fn(),
   ghExecFileAsyncMock: vi.fn(),
   glabExecFileAsyncMock: vi.fn(),
@@ -88,6 +94,17 @@ vi.mock('../gitea/pull-request-creation', () => ({
   isGiteaReviewCreationAuthenticated: isGiteaReviewCreationAuthenticatedMock
 }))
 
+vi.mock('../gitee/client', () => ({
+  getGiteeRepoSlug: getGiteeRepoSlugMock,
+  getGiteePullRequestForBranch: vi.fn(),
+  getGiteePullRequest: vi.fn()
+}))
+
+vi.mock('../gitee/pull-request-creation', () => ({
+  createGiteePullRequest: createGiteePullRequestMock,
+  isGiteeReviewCreationAuthenticated: isGiteeReviewCreationAuthenticatedMock
+}))
+
 vi.mock('../github/gh-utils', () => ({
   acquire: vi.fn(),
   release: vi.fn(),
@@ -123,13 +140,16 @@ function resetMocks(): void {
     createGitLabMergeRequestMock,
     createAzureDevOpsPullRequestMock,
     createGiteaPullRequestMock,
+    createGiteePullRequestMock,
     isAzureDevOpsReviewCreationAuthenticatedMock,
     isGiteaReviewCreationAuthenticatedMock,
+    isGiteeReviewCreationAuthenticatedMock,
     getRepoSlugMock,
     getProjectSlugMock,
     getBitbucketRepoSlugMock,
     getAzureDevOpsRepoSlugMock,
     getGiteaRepoSlugMock,
+    getGiteeRepoSlugMock,
     getHostedReviewForBranchMock,
     ghExecFileAsyncMock,
     glabExecFileAsyncMock,
@@ -147,6 +167,7 @@ function mockGitHubProvider(): void {
   getRepoSlugMock.mockResolvedValue({ owner: 'acme', repo: 'orca' })
   getBitbucketRepoSlugMock.mockResolvedValue(null)
   getAzureDevOpsRepoSlugMock.mockResolvedValue(null)
+  getGiteeRepoSlugMock.mockResolvedValue(null)
   getGiteaRepoSlugMock.mockResolvedValue(null)
   getEnterpriseGitHubRepoSlugMock.mockResolvedValue(null)
 }
@@ -158,6 +179,7 @@ function mockGitHubEnterpriseProvider(): void {
   getRepoSlugMock.mockResolvedValue(null)
   getBitbucketRepoSlugMock.mockResolvedValue(null)
   getAzureDevOpsRepoSlugMock.mockResolvedValue(null)
+  getGiteeRepoSlugMock.mockResolvedValue(null)
   getGiteaRepoSlugMock.mockResolvedValue(null)
   getEnterpriseGitHubRepoSlugMock.mockResolvedValue({
     owner: 'acme',
@@ -171,6 +193,7 @@ function mockGitLabProvider(): void {
   getRepoSlugMock.mockResolvedValue(null)
   getBitbucketRepoSlugMock.mockResolvedValue(null)
   getAzureDevOpsRepoSlugMock.mockResolvedValue(null)
+  getGiteeRepoSlugMock.mockResolvedValue(null)
   getGiteaRepoSlugMock.mockResolvedValue(null)
 }
 
@@ -185,6 +208,7 @@ function mockAzureDevOpsProvider(): void {
     apiBaseUrl: 'https://dev.azure.com/acme/Project',
     webBaseUrl: 'https://dev.azure.com/acme/Project/_git/orca'
   })
+  getGiteeRepoSlugMock.mockResolvedValue(null)
   getGiteaRepoSlugMock.mockResolvedValue(null)
 }
 
@@ -193,12 +217,34 @@ function mockGiteaProvider(): void {
   getRepoSlugMock.mockResolvedValue(null)
   getBitbucketRepoSlugMock.mockResolvedValue(null)
   getAzureDevOpsRepoSlugMock.mockResolvedValue(null)
+  getGiteeRepoSlugMock.mockResolvedValue(null)
   getGiteaRepoSlugMock.mockResolvedValue({
     host: 'git.example.com',
     owner: 'acme',
     repo: 'orca',
     apiBaseUrl: 'https://git.example.com/api/v1',
     webBaseUrl: 'https://git.example.com'
+  })
+}
+
+function mockGiteeProvider(): void {
+  getProjectSlugMock.mockResolvedValue(null)
+  getRepoSlugMock.mockResolvedValue(null)
+  getBitbucketRepoSlugMock.mockResolvedValue(null)
+  getAzureDevOpsRepoSlugMock.mockResolvedValue(null)
+  getGiteeRepoSlugMock.mockResolvedValue({
+    host: 'gitee.com',
+    owner: 'acme',
+    repo: 'orca',
+    apiBaseUrl: 'https://gitee.com/api/v5',
+    webBaseUrl: 'https://gitee.com'
+  })
+  getGiteaRepoSlugMock.mockResolvedValue({
+    host: 'gitee.com',
+    owner: 'acme',
+    repo: 'orca',
+    apiBaseUrl: 'https://gitee.com/api/v1',
+    webBaseUrl: 'https://gitee.com'
   })
 }
 
@@ -212,6 +258,7 @@ describe('getHostedReviewCreationEligibility', () => {
     gitExecFileAsyncMock.mockResolvedValue({ stdout: 'Feature title\n', stderr: '' })
     isAzureDevOpsReviewCreationAuthenticatedMock.mockReturnValue(true)
     isGiteaReviewCreationAuthenticatedMock.mockReturnValue(true)
+    isGiteeReviewCreationAuthenticatedMock.mockReturnValue(true)
   })
 
   it('treats short remote base refs as the default branch name', async () => {
@@ -306,6 +353,95 @@ describe('getHostedReviewCreationEligibility', () => {
     await expect(
       getHostedReviewCreationEligibility(stackedArgs({ base: 'parent-pushed' }))
     ).resolves.toMatchObject({ canCreate: true, defaultBaseRef: 'parent-pushed' })
+  })
+
+  it('blocks a literal HEAD branch as detached without probing the remote', async () => {
+    await expect(
+      getHostedReviewCreationEligibility({
+        repoPath: '/repo',
+        branch: 'HEAD',
+        base: 'main',
+        hasUncommittedChanges: false,
+        hasUpstream: true,
+        ahead: 0,
+        behind: 0
+      })
+    ).resolves.toMatchObject({
+      provider: 'github',
+      canCreate: false,
+      blockedReason: 'detached_head',
+      nextAction: null,
+      head: null
+    })
+  })
+
+  it('blocks an empty branch as detached HEAD', async () => {
+    await expect(
+      getHostedReviewCreationEligibility({
+        repoPath: '/repo',
+        branch: '',
+        base: 'main',
+        hasUncommittedChanges: false,
+        hasUpstream: true,
+        ahead: 0,
+        behind: 0
+      })
+    ).resolves.toMatchObject({
+      canCreate: false,
+      blockedReason: 'detached_head',
+      head: null
+    })
+  })
+
+  it('stays detached_head instead of surfacing a failed review lookup on detached HEAD', async () => {
+    // Why: a flaky existing-review lookup on detached HEAD must degrade to the
+    // stable detached_head blocker, not re-throw a generic preflight error.
+    getHostedReviewForBranchMock.mockRejectedValueOnce(new Error('gh lookup failed'))
+
+    await expect(
+      getHostedReviewCreationEligibility({
+        repoPath: '/repo',
+        branch: 'HEAD',
+        base: 'main',
+        hasUncommittedChanges: false,
+        hasUpstream: true,
+        ahead: 0,
+        behind: 0
+      })
+    ).resolves.toMatchObject({
+      canCreate: false,
+      blockedReason: 'detached_head',
+      head: null
+    })
+  })
+
+  it('surfaces an existing linked review on detached HEAD while still blocking creation', async () => {
+    // G2: an empty branch with a linked review id must still resolve the review
+    // so the sidebar can offer "open existing", even though creation is blocked.
+    getHostedReviewForBranchMock.mockResolvedValueOnce({
+      number: 23,
+      url: 'https://gitee.com/team/orca/pulls/23'
+    })
+
+    await expect(
+      getHostedReviewCreationEligibility({
+        repoPath: '/repo',
+        branch: '',
+        base: 'main',
+        hasUncommittedChanges: false,
+        hasUpstream: true,
+        ahead: 0,
+        behind: 0,
+        linkedGiteePR: 23
+      })
+    ).resolves.toMatchObject({
+      canCreate: false,
+      blockedReason: 'detached_head',
+      review: { number: 23, url: 'https://gitee.com/team/orca/pulls/23' }
+    })
+    expect(getHostedReviewForBranchMock).toHaveBeenCalledWith(
+      expect.objectContaining({ linkedGiteePR: 23 })
+    )
   })
 
   it('blocks dirty tracked GitHub branches before PR creation', async () => {
@@ -525,5 +661,56 @@ describe('getHostedReviewCreationEligibility', () => {
     expect(isGiteaReviewCreationAuthenticatedMock).toHaveBeenCalledOnce()
     expect(ghExecFileAsyncMock).not.toHaveBeenCalled()
     expect(glabExecFileAsyncMock).not.toHaveBeenCalled()
+  })
+
+  it('requires ORCA_GITEE_TOKEN for an otherwise eligible Gitee branch', async () => {
+    mockGiteeProvider()
+    isGiteeReviewCreationAuthenticatedMock.mockReturnValue(false)
+
+    await expect(
+      getHostedReviewCreationEligibility({
+        repoPath: '/repo',
+        branch: 'feature/gitee',
+        base: 'main',
+        hasUncommittedChanges: false,
+        hasUpstream: true,
+        ahead: 0,
+        behind: 0
+      })
+    ).resolves.toMatchObject({
+      provider: 'gitee',
+      canCreate: false,
+      blockedReason: 'auth_required',
+      nextAction: 'authenticate'
+    })
+    expect(isGiteeReviewCreationAuthenticatedMock).toHaveBeenCalledOnce()
+    expect(getGiteaRepoSlugMock).not.toHaveBeenCalled()
+  })
+
+  it('enables creation and forwards linked metadata for token-configured Gitee branches', async () => {
+    mockGiteeProvider()
+
+    await expect(
+      getHostedReviewCreationEligibility({
+        repoPath: '/repo',
+        branch: 'feature/gitee',
+        base: 'main',
+        hasUncommittedChanges: false,
+        hasUpstream: true,
+        ahead: 0,
+        behind: 0,
+        linkedGiteePR: 31
+      })
+    ).resolves.toMatchObject({
+      provider: 'gitee',
+      canCreate: true,
+      blockedReason: null,
+      nextAction: null,
+      head: 'feature/gitee'
+    })
+    expect(getHostedReviewForBranchMock).toHaveBeenCalledWith(
+      expect.objectContaining({ linkedGiteePR: 31 })
+    )
+    expect(isGiteeReviewCreationAuthenticatedMock).toHaveBeenCalledOnce()
   })
 })

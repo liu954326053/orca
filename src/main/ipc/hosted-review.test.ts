@@ -168,7 +168,7 @@ describe('registerHostedReviewHandlers', () => {
     )
   })
 
-  it('routes local WSL project review status through main-process runtime options', async () => {
+  it('routes local WSL Gitee review status through main-process runtime options', async () => {
     setPlatform('win32')
     const localRepo = {
       id: 'repo-local',
@@ -193,11 +193,11 @@ describe('registerHostedReviewHandlers', () => {
       }
     ])
     getHostedReviewForBranchMock.mockResolvedValueOnce({
-      provider: 'github',
+      provider: 'gitee',
       number: 42,
       title: 'Feature PR',
       state: 'open',
-      url: 'https://github.com/acme/orca/pull/42',
+      url: 'https://gitee.com/acme/orca/pulls/42',
       status: 'success',
       updatedAt: '2026-06-16T00:00:00.000Z',
       mergeable: 'MERGEABLE'
@@ -209,7 +209,7 @@ describe('registerHostedReviewHandlers', () => {
       repoPath: localRepo.path,
       repoId: localRepo.id,
       branch: 'feature/wsl',
-      linkedGitHubPR: 42
+      linkedGiteePR: 42
     })
 
     expect(getHostedReviewForBranchMock).toHaveBeenCalledWith(
@@ -217,7 +217,7 @@ describe('registerHostedReviewHandlers', () => {
         repoPath: localRepo.path,
         connectionId: undefined,
         branch: 'feature/wsl',
-        linkedGitHubPR: 42,
+        linkedGiteePR: 42,
         localGitExecOptions: { wslDistro: 'Ubuntu' }
       })
     )

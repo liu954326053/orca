@@ -161,6 +161,22 @@ import {
 } from '@/components/linear-project-view-surfaces'
 import JiraIssueWorkspace from '@/components/JiraIssueWorkspace'
 import { TaskPageJiraIssueList } from '@/components/task-page-jira-issue-list'
+import { TaskPageGiteeList, TaskPageGiteeToolbar } from '@/components/task-page-gitee-list'
+import { TaskPageGiteeCreateIssueDialog } from '@/components/task-page-gitee-create-issue-dialog'
+import {
+  mergeGiteeTaskPageRepoResults,
+  toGiteeIssueTaskPageItem,
+  toGiteePullTaskPageItem,
+  type GiteeTaskPageItem,
+  type GiteeTaskPageMode,
+  type GiteeTaskPageRepoResult,
+  type GiteeTaskPageState
+} from '@/components/task-page-gitee-items'
+import {
+  getGiteeIssueRequestStates,
+  getGiteePullRequestState,
+  normalizeGiteeSearchQuery
+} from '@/components/task-page-gitee-query'
 import {
   getSingleJiraProjectScope,
   getTaskPageJiraStatusOrderScopeKey,
@@ -243,6 +259,8 @@ import {
   normalizeTaskRepoSelection
 } from '@/components/task-page-default-repo-selection'
 import {
+  getGiteeProviderAvailability,
+  getGiteeTaskSourceAvailabilityNotice,
   getRepoBackedProviderAvailability,
   type RuntimeProviderPreflightStatus
 } from '@/components/task-source-provider-availability'
@@ -341,6 +359,15 @@ import {
 } from './jira-issue-sorter'
 import { TaskPageJiraSortControls } from './task-page-jira-sort-controls'
 import {
+  applyGiteeStartWorkspaceAction,
+  createGiteeTaskPageActions,
+  openGiteeWorkItemInBrowser
+} from '@/lib/task-page-gitee-actions'
+import {
+  findGiteeWorkItemWorkspaceAttachment,
+  type GiteeTaskWorkItem
+} from '@/lib/gitee-work-item-workspace-attachment'
+import {
   normalizeVisibleTaskProviders,
   restoreAvailableDefaultTaskProvider,
   resolveVisibleTaskProvider
@@ -424,7 +451,7 @@ function getJiraIssueWorkspaceSeed(issue: JiraIssue): string {
 
 function getTaskPageRepoSourceContext(
   repo: Repo | null | undefined,
-  provider: 'github' | 'gitlab',
+  provider: 'github' | 'gitlab' | 'gitee',
   gitlabProjectRef?: GitLabProjectRef | null
 ): TaskSourceContext | null {
   if (!repo) {
@@ -435,10 +462,21 @@ function getTaskPageRepoSourceContext(
   const setup = projection.setups[0]
   const providerIdentity =
     provider === 'github' && project?.providerIdentity?.provider === 'github'
-      ? project.providerIdentity
+      ? {
+          provider: 'github' as const,
+          owner: project.providerIdentity.owner,
+          repo: project.providerIdentity.repo
+        }
       : provider === 'gitlab' && gitlabProjectRef
         ? buildGitLabProviderIdentity(gitlabProjectRef)
-        : null
+        : provider === 'gitee' && project?.providerIdentity?.provider === 'gitee'
+          ? {
+              provider: 'gitee' as const,
+              host: 'gitee.com',
+              owner: project.providerIdentity.owner,
+              repo: project.providerIdentity.repo
+            }
+          : null
   return normalizeTaskSourceContext({
     provider,
     projectId: setup?.projectId ?? project?.id ?? repo.id,
@@ -3316,7 +3354,7 @@ export default function TaskPage(): React.JSX.Element {
   )
   const taskSourceRepoContexts = useMemo(
     () =>
-      taskSource === 'github' || taskSource === 'gitlab'
+      taskSource === 'github' || taskSource === 'gitlab' || taskSource === 'gitee'
         ? selectedRepos
             .map((repo) => getTaskPageRepoSourceContext(repo, taskSource))
             .filter((context): context is TaskSourceContext => context !== null)
@@ -3350,7 +3388,7 @@ export default function TaskPage(): React.JSX.Element {
     [hostRegistryById]
   )
   const runtimeTaskSourceHostIds = useMemo(() => {
-    if (taskSource !== 'github' && taskSource !== 'gitlab') {
+    if (taskSource !== 'github' && taskSource !== 'gitlab' && taskSource !== 'gitee') {
       return []
     }
     const hostIds = new Set<TaskSourceContext['hostId']>()
@@ -3392,7 +3430,7 @@ export default function TaskPage(): React.JSX.Element {
         continue
       }
       // Why: task sources can span multiple runtime hosts; each runtime owns
-      // its own gh/glab installation and auth state.
+      // its own provider installation/auth state.
       void callRuntimeRpc<PreflightStatus>(
         { kind: 'environment', environmentId: parsed.environmentId },
         'preflight.check',
@@ -3423,7 +3461,8 @@ export default function TaskPage(): React.JSX.Element {
   }, [runtimeTaskSourceHostIds])
   const getTaskPickerRepoHostLabel = useCallback(
     (repo: Repo): string | null => {
-      const provider = taskSource === 'gitlab' ? 'gitlab' : 'github'
+      const provider =
+        taskSource === 'gitlab' ? 'gitlab' : taskSource === 'gitee' ? 'gitee' : 'github'
       const context = getTaskPageRepoSourceContext(repo, provider)
       const hostId = context?.hostId ?? repo.executionHostId ?? 'local'
       return hostRegistryById.get(hostId)?.label ?? null
@@ -3431,22 +3470,31 @@ export default function TaskPage(): React.JSX.Element {
     [hostRegistryById, taskSource]
   )
   const taskSourceHostAvailability = useMemo<TaskSourceHostAvailability[]>(() => {
-    if (taskSource !== 'github' && taskSource !== 'gitlab') {
+    if (taskSource !== 'github' && taskSource !== 'gitlab' && taskSource !== 'gitee') {
       return []
     }
+    const providerAvailability =
+      taskSource === 'gitee'
+        ? getGiteeProviderAvailability({
+            contexts: taskSourceRepoContexts,
+            preflightStatus,
+            preflightReady: preflightStatusCurrent && preflightStatusChecked,
+            runtimePreflightStatusByHostId
+          })
+        : getRepoBackedProviderAvailability({
+            provider: taskSource,
+            contexts: taskSourceRepoContexts,
+            preflightStatus,
+            preflightReady: preflightStatusCurrent && preflightStatusChecked,
+            runtimePreflightStatusByHostId
+          })
     return [
       ...taskSourceRepoContexts.flatMap((context) => {
         const host = hostRegistryById.get(context.hostId)
         const availability = getTaskSourceHostAvailabilityForHost(host, context.hostId)
         return availability ? [availability] : []
       }),
-      ...getRepoBackedProviderAvailability({
-        provider: taskSource,
-        contexts: taskSourceRepoContexts,
-        preflightStatus,
-        preflightReady: preflightStatusCurrent && preflightStatusChecked,
-        runtimePreflightStatusByHostId
-      })
+      ...providerAvailability
     ]
   }, [
     hostRegistryById,
@@ -3536,7 +3584,7 @@ export default function TaskPage(): React.JSX.Element {
     Partial<Record<TaskProvider, TaskSourceAvailabilityNotice>>
   >(() => {
     const availabilityForContexts = (
-      provider: Extract<TaskProvider, 'github' | 'gitlab'>,
+      provider: Extract<TaskProvider, 'github' | 'gitlab' | 'gitee'>,
       contexts: readonly TaskSourceContext[]
     ): TaskSourceHostAvailability[] => [
       ...contexts.flatMap((context) => {
@@ -3544,13 +3592,20 @@ export default function TaskPage(): React.JSX.Element {
         const availability = getTaskSourceHostAvailabilityForHost(host, context.hostId)
         return availability ? [availability] : []
       }),
-      ...getRepoBackedProviderAvailability({
-        provider,
-        contexts,
-        preflightStatus,
-        preflightReady: preflightStatusCurrent && preflightStatusChecked,
-        runtimePreflightStatusByHostId
-      })
+      ...(provider === 'gitee'
+        ? getGiteeProviderAvailability({
+            contexts,
+            preflightStatus,
+            preflightReady: preflightStatusCurrent && preflightStatusChecked,
+            runtimePreflightStatusByHostId
+          })
+        : getRepoBackedProviderAvailability({
+            provider,
+            contexts,
+            preflightStatus,
+            preflightReady: preflightStatusCurrent && preflightStatusChecked,
+            runtimePreflightStatusByHostId
+          }))
     ]
     const accountHost = hostRegistryById.get(accountBackedTaskSourceHostId)
     const accountHostAvailability = getTaskSourceHostAvailabilityForHost(
@@ -3582,6 +3637,18 @@ export default function TaskPage(): React.JSX.Element {
             'gitlab',
             selectedRepos
               .map((repo) => getTaskPageRepoSourceContext(repo, 'gitlab'))
+              .filter((context): context is TaskSourceContext => context !== null)
+          )
+        }) ?? undefined,
+      gitee:
+        getGiteeTaskSourceAvailabilityNotice({
+          providerLabel: labelFor('gitee'),
+          sourceCount: selectedRepos.length,
+          hostLabelById,
+          hostAvailability: availabilityForContexts(
+            'gitee',
+            selectedRepos
+              .map((repo) => getTaskPageRepoSourceContext(repo, 'gitee'))
               .filter((context): context is TaskSourceContext => context !== null)
           )
         }) ?? undefined,
@@ -3644,7 +3711,7 @@ export default function TaskPage(): React.JSX.Element {
   const taskSourceAvailabilityNotice = useMemo(() => {
     const providerLabel =
       sourceOptions.find((source) => source.id === taskSource)?.label ?? taskSource
-    return getTaskSourceAvailabilityNotice({
+    const noticeArgs = {
       providerLabel,
       sourceCount:
         taskSource === 'linear' || taskSource === 'jira'
@@ -3655,7 +3722,10 @@ export default function TaskPage(): React.JSX.Element {
           ? accountBackedTaskSourceHostAvailability
           : taskSourceHostAvailability,
       hostLabelById
-    })
+    }
+    return taskSource === 'gitee'
+      ? getGiteeTaskSourceAvailabilityNotice(noticeArgs)
+      : getTaskSourceAvailabilityNotice(noticeArgs)
   }, [
     accountBackedTaskSourceHostAvailability,
     hostLabelById,
@@ -3729,6 +3799,14 @@ export default function TaskPage(): React.JSX.Element {
   const [gitlabLoading, setGitlabLoading] = useState(false)
   const [gitlabError, setGitlabError] = useState<string | null>(null)
   const [gitlabRefreshNonce, setGitlabRefreshNonce] = useState(0)
+  const [giteeMode, setGiteeMode] = useState<GiteeTaskPageMode>('issues')
+  const [giteeState, setGiteeState] = useState<GiteeTaskPageState>('open')
+  const [giteeItems, setGiteeItems] = useState<GiteeTaskPageItem[]>([])
+  const [giteeLoading, setGiteeLoading] = useState(false)
+  const [giteeError, setGiteeError] = useState<string | null>(null)
+  const [giteeRefreshNonce, setGiteeRefreshNonce] = useState(0)
+  const [giteeSearchQuery, setGiteeSearchQuery] = useState('')
+  const [newGiteeIssueOpen, setNewGiteeIssueOpen] = useState(false)
   // Why: opens GitLabItemDialog when a row is clicked. Separate state from
   // gitlabItems so the dialog target survives a list refresh that might
   // remove the item from the visible filter (e.g. closing an MR while
@@ -4912,7 +4990,7 @@ export default function TaskPage(): React.JSX.Element {
     jiraTaskSourceContext
   ])
 
-  // Why: stable key for `selectedRepos` so the GitLab fetch effect below
+  // Why: stable key for `selectedRepos` so repo-backed fetch effects below
   // doesn't re-run on every parent re-render just because the array
   // reference changed. The memoized string keys off id + path +
   // connectionId — the only fields the effect actually reads.
@@ -4923,6 +5001,124 @@ export default function TaskPage(): React.JSX.Element {
         .join(','),
     [selectedRepos]
   )
+
+  // Why: Gitee task rows execute on each repo's owning host. Runtime-backed
+  // repos use RPC while local, WSL, and SSH repos stay behind validated IPC.
+  useEffect(() => {
+    if (taskSource !== 'gitee') {
+      return
+    }
+    if (selectedRepos.length === 0) {
+      setGiteeItems([])
+      setGiteeError(null)
+      setGiteeLoading(false)
+      return
+    }
+
+    let stale = false
+    setGiteeItems([])
+    setGiteeError(null)
+    setGiteeLoading(true)
+
+    const fetchRepo = async (
+      repo: (typeof selectedRepos)[number]
+    ): Promise<GiteeTaskPageRepoResult> => {
+      const sourceContext = getTaskPageRepoSourceContext(repo, 'gitee')
+      const target = getActiveRuntimeTarget(getTaskSourceRuntimeSettings(sourceContext))
+      if (giteeMode === 'issues') {
+        const results = await Promise.all(
+          getGiteeIssueRequestStates(giteeState).map((state) =>
+            target.kind === 'environment'
+              ? callRuntimeRpc<Awaited<ReturnType<typeof window.api.gitee.listIssues>>>(
+                  target,
+                  'gitee.listIssues',
+                  {
+                    repo: `id:${repo.id}`,
+                    state,
+                    q: normalizeGiteeSearchQuery(giteeSearchQuery),
+                    page: 1,
+                    perPage: 50
+                  },
+                  { timeoutMs: 20_000 }
+                )
+              : window.api.gitee.listIssues({
+                  repoPath: repo.path,
+                  repoId: repo.id,
+                  sourceContext,
+                  state,
+                  q: normalizeGiteeSearchQuery(giteeSearchQuery),
+                  page: 1,
+                  perPage: 50
+                })
+          )
+        )
+        return {
+          repoId: repo.id,
+          items: results.flatMap((result) =>
+            result.items.map((issue) => toGiteeIssueTaskPageItem(repo.id, issue))
+          ),
+          error: results.find((result) => result.error)?.error
+        }
+      }
+
+      const pullState = getGiteePullRequestState(giteeState)
+      const result =
+        target.kind === 'environment'
+          ? await callRuntimeRpc<Awaited<ReturnType<typeof window.api.gitee.listPulls>>>(
+              target,
+              'gitee.listPulls',
+              { repo: `id:${repo.id}`, state: pullState, page: 1, perPage: 50 },
+              { timeoutMs: 20_000 }
+            )
+          : await window.api.gitee.listPulls({
+              repoPath: repo.path,
+              repoId: repo.id,
+              sourceContext,
+              state: pullState,
+              page: 1,
+              perPage: 50
+            })
+      return {
+        repoId: repo.id,
+        items: result.items.map((pull) => toGiteePullTaskPageItem(repo.id, pull)),
+        error: result.error
+      }
+    }
+
+    void Promise.allSettled(selectedRepos.map(fetchRepo))
+      .then((results) => {
+        if (stale) {
+          return
+        }
+        const repoResults = results.map<GiteeTaskPageRepoResult>((result, index) => {
+          if (result.status === 'fulfilled') {
+            return result.value
+          }
+          const reason = result.reason
+          return {
+            repoId: selectedRepos[index]?.id ?? `unknown-${index}`,
+            items: [],
+            error: {
+              type: 'unknown',
+              message: reason instanceof Error ? reason.message : String(reason)
+            }
+          }
+        })
+        const merged = mergeGiteeTaskPageRepoResults(repoResults)
+        setGiteeItems(merged.items)
+        setGiteeError(merged.error)
+      })
+      .finally(() => {
+        if (!stale) {
+          setGiteeLoading(false)
+        }
+      })
+
+    return () => {
+      stale = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- selectedReposKey captures every repo field read by the request and avoids array-reference churn.
+  }, [taskSource, giteeMode, giteeState, giteeSearchQuery, giteeRefreshNonce, selectedReposKey])
 
   // Why: GitLab task-source data fetch. Issues and MRs are fetched
   // separately (mirrors GitHub's separate Issues / PRs endpoints) so
@@ -6839,6 +7035,147 @@ export default function TaskPage(): React.JSX.Element {
     [openComposerForGitLabItem]
   )
 
+  // Why: Gitee Start/resume + browser detail for task rows. List shell (7/9)
+  // calls these; meta is written via composer linkedGiteeIssue/linkedGiteePR.
+  const giteeTaskPageActions = useMemo(
+    () =>
+      createGiteeTaskPageActions({
+        worktrees: allWorktrees,
+        getTaskSourceContext: (repoId) => getTaskPageRepoSourceContext(repoMap.get(repoId), 'gitee')
+      }),
+    [allWorktrees, repoMap]
+  )
+
+  const handleUseGiteeItem = useCallback(
+    (item: GiteeTaskPageItem): void => {
+      const workItem: GiteeTaskWorkItem = {
+        type: item.type,
+        number: item.number,
+        title: item.title,
+        url: item.url,
+        repoId: item.repoId
+      }
+      void applyGiteeStartWorkspaceAction(giteeTaskPageActions.startOrResume(workItem), {
+        activateAndRevealWorktree: (worktreeId) => {
+          activateAndRevealWorktree(worktreeId)
+        },
+        openComposer: (payload) => {
+          openModal('new-workspace-composer', payload)
+        },
+        recordFeatureInteraction: () => {
+          void useAppStore.getState().recordFeatureInteraction('tasks')
+        }
+      })
+    },
+    [giteeTaskPageActions, openModal]
+  )
+
+  const handleOpenGiteeItemInBrowser = useCallback((item: Pick<GiteeTaskPageItem, 'url'>): void => {
+    void openGiteeWorkItemInBrowser(item, (url) => window.api.shell.openUrl(url))
+  }, [])
+
+  const renderGiteeStartAction = useCallback(
+    (item: GiteeTaskPageItem): React.ReactNode => {
+      const attached = findGiteeWorkItemWorkspaceAttachment(
+        allWorktrees,
+        item.repoId,
+        item.type,
+        item.number
+      )
+      return (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              variant={attached ? 'default' : 'outline'}
+              size="icon-xs"
+              data-contextual-tour-target="tasks-start-workspace"
+              onClick={(event) => {
+                event.stopPropagation()
+                handleUseGiteeItem(item)
+              }}
+              aria-label={
+                attached
+                  ? translate(
+                      'auto.components.TaskPage.giteeResumeWorkspace',
+                      'Resume workspace attached to Gitee {{value0}} #{{value1}}',
+                      {
+                        value0: item.type === 'pr' ? 'PR' : 'issue',
+                        value1: item.number
+                      }
+                    )
+                  : translate(
+                      'auto.components.TaskPage.giteeStartWorkspace',
+                      'Start workspace from Gitee {{value0}} #{{value1}}',
+                      {
+                        value0: item.type === 'pr' ? 'PR' : 'issue',
+                        value1: item.number
+                      }
+                    )
+              }
+            >
+              <ArrowRight className="size-3.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" sideOffset={6}>
+            {attached
+              ? translate('auto.components.TaskPage.7753652524', 'Resume')
+              : translate('auto.components.TaskPage.9497f2787c', 'Start workspace')}
+          </TooltipContent>
+        </Tooltip>
+      )
+    },
+    [allWorktrees, handleUseGiteeItem]
+  )
+
+  const handleCreateGiteeIssue = useCallback(
+    async ({ title, body }: { title: string; body: string }): Promise<void> => {
+      if (!primaryRepo) {
+        throw new Error(
+          translate(
+            'auto.components.TaskPage.giteeCreateIssueSelectProject',
+            '请先选择一个 Gitee 项目。'
+          )
+        )
+      }
+      const sourceContext = getTaskPageRepoSourceContext(primaryRepo, 'gitee')
+      const target = getActiveRuntimeTarget(getTaskSourceRuntimeSettings(sourceContext))
+      const result =
+        target.kind === 'environment'
+          ? await callRuntimeRpc<
+              | Awaited<ReturnType<typeof window.api.gitee.createIssue>>
+              | { number: string | number; url: string }
+              | null
+            >(
+              target,
+              'gitee.createIssue',
+              { repo: `id:${primaryRepo.id}`, title, body },
+              { timeoutMs: 20_000 }
+            )
+          : await window.api.gitee.createIssue({
+              repoPath: primaryRepo.path,
+              repoId: primaryRepo.id,
+              sourceContext,
+              title,
+              body
+            })
+
+      if (!result) {
+        throw new Error(
+          translate('auto.components.TaskPage.giteeCreateIssueFailed', '创建 Gitee Issue 失败。')
+        )
+      }
+      if ('ok' in result && !result.ok) {
+        throw new Error(result.error)
+      }
+
+      // Why: the dialog owns close/reset; this nonce makes the successful write
+      // visible without coupling the reusable dialog to list state.
+      setGiteeRefreshNonce((current) => current + 1)
+    },
+    [primaryRepo]
+  )
+
   const handleCreateNewIssue = useCallback(async (): Promise<void> => {
     if (!newIssueTargetRepo) {
       return
@@ -8113,6 +8450,7 @@ export default function TaskPage(): React.JSX.Element {
     taskSource,
     hasGitHubDetail: Boolean(dialogWorkItem),
     hasGitLabDetail: Boolean(gitlabDialogItem),
+    hasGiteeDetail: false,
     hasJiraDetail: Boolean(selectedJiraIssue),
     hasLinearIssueDetail: Boolean(selectedLinearIssue),
     hasLinearProjectContext: Boolean(selectedLinearProject),
@@ -9070,6 +9408,61 @@ export default function TaskPage(): React.JSX.Element {
                       </div>
                     </div>
                   </div>
+                ) : taskSource === 'gitee' ? (
+                  <TaskPageGiteeToolbar
+                    loading={giteeLoading}
+                    mode={giteeMode}
+                    state={giteeState}
+                    onModeChange={(mode) => {
+                      setGiteeMode(mode)
+                      if (mode === 'prs' && giteeState === 'progressing') {
+                        setGiteeState('open')
+                      }
+                    }}
+                    onStateChange={setGiteeState}
+                    onRefresh={() => setGiteeRefreshNonce((n) => n + 1)}
+                    searchQuery={giteeSearchQuery}
+                    onSearchChange={giteeMode === 'issues' ? setGiteeSearchQuery : undefined}
+                    onCreateIssue={
+                      giteeMode === 'issues' && primaryRepo
+                        ? () => setNewGiteeIssueOpen(true)
+                        : undefined
+                    }
+                    repoSelector={
+                      <TaskProjectSourceCombobox
+                        groups={taskPickerGroups}
+                        selected={repoSelection}
+                        getRepoHostLabel={getTaskPickerRepoHostLabel}
+                        onChange={(next) => {
+                          const normalized = normalizeTaskRepoSelection(eligibleRepos, next)
+                          setRepoSelection(normalized)
+                          void updateSettings({ defaultRepoSelection: [...normalized] }).catch(
+                            () => {
+                              toast.error(
+                                translate(
+                                  'auto.components.TaskPage.dfd72673e7',
+                                  'Failed to save project selection.'
+                                )
+                              )
+                            }
+                          )
+                        }}
+                        onSelectAll={() => {
+                          const allIds = new Set(taskPickerRepos.map((repo) => repo.id))
+                          setRepoSelection(allIds)
+                          void updateSettings({ defaultRepoSelection: null }).catch(() => {
+                            toast.error(
+                              translate(
+                                'auto.components.TaskPage.dfd72673e7',
+                                'Failed to save project selection.'
+                              )
+                            )
+                          })
+                        }}
+                        triggerClassName="h-8 w-full rounded-md border border-border/50 bg-muted/50 px-2 text-xs font-medium shadow-sm transition hover:bg-muted/50 focus:ring-2 focus:ring-ring/20 focus:outline-none"
+                      />
+                    }
+                  />
                 ) : taskSource === 'gitlab' ? (
                   <>
                     <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -9807,6 +10200,19 @@ export default function TaskPage(): React.JSX.Element {
                 </div>
               ) : null}
             </div>
+          ) : taskSource === 'gitee' ? (
+            <TaskPageGiteeList
+              error={giteeError}
+              items={giteeItems}
+              loading={giteeLoading}
+              mode={giteeMode}
+              onOpenItem={handleOpenGiteeItemInBrowser}
+              renderAction={renderGiteeStartAction}
+              repoNamesById={
+                new Map(selectedRepos.map((repo) => [repo.id, repo.displayName || repo.id]))
+              }
+              selectedRepoCount={selectedRepos.length}
+            />
           ) : taskSource === 'gitlab' && gitlabView === 'todos' ? (
             <div className="flex min-h-0 max-h-full flex-col rounded-md border border-t-0 border-border/50 bg-muted/50 overflow-hidden rounded-t-none shadow-sm">
               <div className="flex-none grid grid-cols-[110px_minmax(0,3fr)_minmax(120px,1.2fr)_110px_50px] gap-3 border-b border-border/50 px-3 py-2 text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
@@ -11135,6 +11541,13 @@ export default function TaskPage(): React.JSX.Element {
           )}
         </div>
       </div>
+
+      <TaskPageGiteeCreateIssueDialog
+        open={newGiteeIssueOpen}
+        onOpenChange={setNewGiteeIssueOpen}
+        onSubmit={handleCreateGiteeIssue}
+        targetLabel={primaryRepo?.displayName ?? primaryRepo?.id ?? null}
+      />
 
       <Dialog
         open={newIssueOpen}

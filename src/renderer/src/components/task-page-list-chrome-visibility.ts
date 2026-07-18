@@ -4,6 +4,7 @@ export type TaskPageListChromeVisibilityState = {
   taskSource: TaskProvider
   hasGitHubDetail: boolean
   hasGitLabDetail: boolean
+  hasGiteeDetail: boolean
   hasJiraDetail: boolean
   hasLinearIssueDetail: boolean
   hasLinearProjectContext: boolean
@@ -14,6 +15,7 @@ export function shouldHideTaskPageListChrome({
   taskSource,
   hasGitHubDetail,
   hasGitLabDetail,
+  hasGiteeDetail,
   hasJiraDetail,
   hasLinearIssueDetail,
   hasLinearProjectContext,
@@ -26,6 +28,8 @@ export function shouldHideTaskPageListChrome({
       return hasGitHubDetail
     case 'gitlab':
       return hasGitLabDetail
+    case 'gitee':
+      return hasGiteeDetail
     case 'jira':
       return hasJiraDetail
     case 'linear':

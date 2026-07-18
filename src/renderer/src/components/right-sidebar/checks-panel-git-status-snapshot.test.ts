@@ -66,7 +66,8 @@ describe('buildChecksPanelGitStatusContextKey', () => {
       linkedGitLabMR: null,
       linkedBitbucketPR: null,
       linkedAzureDevOpsPR: null,
-      linkedGiteaPR: null
+      linkedGiteaPR: null,
+      linkedGiteePR: null
     })
 
     expect(
@@ -76,7 +77,8 @@ describe('buildChecksPanelGitStatusContextKey', () => {
         linkedGitLabMR: null,
         linkedBitbucketPR: null,
         linkedAzureDevOpsPR: null,
-        linkedGiteaPR: null
+        linkedGiteaPR: null,
+        linkedGiteePR: null
       })
     ).not.toBe(unlinkedContext)
     expect(
@@ -86,7 +88,8 @@ describe('buildChecksPanelGitStatusContextKey', () => {
         linkedGitLabMR: null,
         linkedBitbucketPR: 34,
         linkedAzureDevOpsPR: null,
-        linkedGiteaPR: null
+        linkedGiteaPR: null,
+        linkedGiteePR: null
       })
     ).not.toBe(unlinkedContext)
     expect(
@@ -96,7 +99,8 @@ describe('buildChecksPanelGitStatusContextKey', () => {
         linkedGitLabMR: null,
         linkedBitbucketPR: null,
         linkedAzureDevOpsPR: 56,
-        linkedGiteaPR: null
+        linkedGiteaPR: null,
+        linkedGiteePR: null
       })
     ).not.toBe(unlinkedContext)
     expect(
@@ -106,7 +110,19 @@ describe('buildChecksPanelGitStatusContextKey', () => {
         linkedGitLabMR: null,
         linkedBitbucketPR: null,
         linkedAzureDevOpsPR: null,
-        linkedGiteaPR: 78
+        linkedGiteaPR: 78,
+        linkedGiteePR: null
+      })
+    ).not.toBe(unlinkedContext)
+    expect(
+      buildChecksPanelGitStatusContextKey({
+        ...base,
+        linkedGitHubPR: null,
+        linkedGitLabMR: null,
+        linkedBitbucketPR: null,
+        linkedAzureDevOpsPR: null,
+        linkedGiteaPR: null,
+        linkedGiteePR: 90
       })
     ).not.toBe(unlinkedContext)
   })

@@ -153,6 +153,7 @@ describe('WorktreeCard hosted review refresh', () => {
       linkedBitbucketPR: null,
       linkedAzureDevOpsPR: null,
       linkedGiteaPR: null,
+      linkedGiteePR: null,
       staleWhileRevalidate: true
     })
   })
