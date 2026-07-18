@@ -214,12 +214,19 @@ export async function getGiteePullRequestForBranch(
     )
     const fromFilter = filtered?.find((item) => matchesGiteeBranch(item, branchName))
     if (fromFilter) {
-      return mapGiteePullRequest(fromFilter)
+      const pullRequest = mapGiteePullRequest(fromFilter)
+      // Why: a closed branch match is abandoned history unless the user explicitly linked it.
+      return typeof linkedPRNumber !== 'number' && pullRequest?.state === 'closed'
+        ? null
+        : pullRequest
     }
 
     const fromScan = await findPullRequestByBranchScan(repo, branchName)
     if (fromScan) {
-      return mapGiteePullRequest(fromScan)
+      const pullRequest = mapGiteePullRequest(fromScan)
+      return typeof linkedPRNumber !== 'number' && pullRequest?.state === 'closed'
+        ? null
+        : pullRequest
     }
   }
 

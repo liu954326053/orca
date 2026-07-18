@@ -2166,6 +2166,15 @@ function isMergedImplicitPR(data: PullRequestLookupData, linkedPRNumber?: number
   return typeof linkedPRNumber !== 'number' && mapPRState(data.state, data.isDraft) === 'merged'
 }
 
+function isClosedUnmergedImplicitPR(
+  data: PullRequestLookupData,
+  linkedPRNumber?: number | null
+): boolean {
+  // Why: a closed-unmerged PR is abandoned branch history unless the user
+  // explicitly linked it; matching the current HEAD does not revive it.
+  return typeof linkedPRNumber !== 'number' && mapPRState(data.state, data.isDraft) === 'closed'
+}
+
 async function getCurrentHeadOid(
   repoPath: string,
   connectionId?: string | null,
@@ -3111,6 +3120,9 @@ export async function getPRForBranchOutcome(
         }
       }
     }
+    if (data && isClosedUnmergedImplicitPR(data, linkedPRNumber)) {
+      return { kind: 'no-pr', fetchedAt: Date.now() }
+    }
     let mergedBranchLookupNumber: number | null = null
     if (await hideMergedImplicitPR(data, dataRepo)) {
       mergedBranchLookupNumber = data?.number ?? null
@@ -3126,6 +3138,9 @@ export async function getPRForBranchOutcome(
       })
       data = fallbackLookup.data
       dataRepo = fallbackLookup.dataRepo
+    }
+    if (data && isClosedUnmergedImplicitPR(data, linkedPRNumber)) {
+      return { kind: 'no-pr', fetchedAt: Date.now() }
     }
     if (!data) {
       if (hasPendingBranchLookupError) {

@@ -346,7 +346,12 @@ export async function getMergeRequestForBranch(
         // Why: older GitLab list payloads expose `pipeline` instead of
         // `head_pipeline`, matching the detail endpoint compatibility path.
         const pipelineStatus = derivePipelineStatus(raw.head_pipeline ?? raw.pipeline ?? null)
-        return mapMRInfo(raw, pipelineStatus)
+        const mergeRequest = mapMRInfo(raw, pipelineStatus)
+        // Why: a closed branch match is abandoned history unless the user
+        // explicitly linked that MR to the worktree.
+        return typeof linkedMRIid !== 'number' && mergeRequest.state === 'closed'
+          ? null
+          : mergeRequest
       }
     }
     if (typeof linkedMRIid !== 'number') {

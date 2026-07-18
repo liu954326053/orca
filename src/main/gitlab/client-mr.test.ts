@@ -330,6 +330,42 @@ describe('gitlab client — MR operations', () => {
       )
     })
 
+    it('ignores a closed MR discovered implicitly by branch', async () => {
+      getProjectRefMock.mockResolvedValueOnce({ host: 'gitlab.com', path: 'g/p' })
+      glabExecFileAsyncMock.mockResolvedValueOnce({
+        stdout: JSON.stringify([
+          {
+            iid: 13,
+            title: 'Abandoned branch MR',
+            state: 'closed',
+            sha: 'closed-head'
+          }
+        ])
+      })
+
+      await expect(getMergeRequestForBranch('/repo', 'feature/abandoned')).resolves.toBeNull()
+    })
+
+    it('shows a closed MR when it is explicitly linked', async () => {
+      getProjectRefMock.mockResolvedValueOnce({ host: 'gitlab.com', path: 'g/p' })
+      glabExecFileAsyncMock.mockResolvedValueOnce({ stdout: '[]' }).mockResolvedValueOnce({
+        stdout: JSON.stringify({
+          iid: 14,
+          title: 'Explicitly linked closed MR',
+          state: 'closed',
+          sha: 'closed-head'
+        })
+      })
+
+      await expect(
+        getMergeRequestForBranch('/repo', 'local-review-branch', 14)
+      ).resolves.toMatchObject({
+        number: 14,
+        state: 'closed',
+        headSha: 'closed-head'
+      })
+    })
+
     it('uses legacy pipeline payloads when branch MR lists omit head_pipeline', async () => {
       getProjectRefMock.mockResolvedValueOnce({ host: 'gitlab.com', path: 'g/p' })
       glabExecFileAsyncMock.mockResolvedValueOnce({

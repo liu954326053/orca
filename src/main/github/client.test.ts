@@ -751,6 +751,61 @@ describe('getPRForBranch', () => {
     })
   })
 
+  it('ignores a closed unmerged PR discovered implicitly even when it matches current HEAD', async () => {
+    getOwnerRepoMock.mockResolvedValueOnce({ owner: 'acme', repo: 'widgets' })
+    ghExecFileAsyncMock.mockResolvedValueOnce({
+      stdout: JSON.stringify([
+        {
+          number: 5901,
+          title: 'Abandoned branch PR',
+          state: 'closed',
+          merged_at: null,
+          html_url: 'https://github.com/acme/widgets/pull/5901',
+          updated_at: '2026-07-18T00:00:00Z',
+          draft: false,
+          mergeable_state: 'clean',
+          head: { ref: 'abandoned-work', sha: 'current-head-oid' },
+          base: { ref: 'main', sha: 'base-oid' }
+        }
+      ])
+    })
+
+    const outcome = await getPRForBranchOutcome('/repo-root', 'abandoned-work', null, null, null, {
+      currentHeadOid: 'current-head-oid'
+    })
+
+    expect(outcome.kind).toBe('no-pr')
+    expect(gitExecFileAsyncMock).not.toHaveBeenCalled()
+  })
+
+  it('shows a closed unmerged PR when it is explicitly linked', async () => {
+    getOwnerRepoMock.mockResolvedValueOnce({ owner: 'acme', repo: 'widgets' })
+    ghExecFileAsyncMock.mockResolvedValueOnce({
+      stdout: JSON.stringify({
+        number: 5902,
+        title: 'Explicitly linked closed PR',
+        state: 'CLOSED',
+        url: 'https://github.com/acme/widgets/pull/5902',
+        statusCheckRollup: [],
+        updatedAt: '2026-07-18T00:00:00Z',
+        isDraft: false,
+        mergeable: 'UNKNOWN',
+        baseRefName: 'main',
+        headRefName: 'abandoned-work',
+        baseRefOid: 'base-oid',
+        headRefOid: 'closed-head-oid'
+      })
+    })
+
+    const pr = await getPRForBranch('/repo-root', 'abandoned-work', 5902)
+
+    expect(pr).toMatchObject({
+      number: 5902,
+      state: 'closed',
+      headSha: 'closed-head-oid'
+    })
+  })
+
   const mockMergedBranchPRLookupBehindHead = (prNumber = 6011): void => {
     getOwnerRepoMock.mockResolvedValueOnce({ owner: 'acme', repo: 'widgets' })
     ghExecFileAsyncMock

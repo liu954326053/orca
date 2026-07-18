@@ -96,6 +96,33 @@ describe('Gitee client', () => {
     expect(url.searchParams.get('per_page')).toBe('50')
   })
 
+  it('ignores a closed pull request discovered implicitly by branch', async () => {
+    const fetchMock = vi.fn(async () =>
+      Response.json([{ ...giteePr(13, 'feature/abandoned'), state: 'closed' }])
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(getGiteePullRequestForBranch('/repo', 'feature/abandoned')).resolves.toBeNull()
+    expect(fetchMock).toHaveBeenCalledOnce()
+  })
+
+  it('shows a closed pull request when it is explicitly linked', async () => {
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const url = new URL(String(input))
+      return Response.json(
+        url.pathname.endsWith('/pulls/14') ? { ...giteePr(14, 'remote-name'), state: 'closed' } : []
+      )
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(
+      getGiteePullRequestForBranch('/repo', 'local-review-branch', 14)
+    ).resolves.toMatchObject({
+      number: 14,
+      state: 'closed'
+    })
+  })
+
   it('falls back to a paginated scan when the head-filtered request fails', async () => {
     const fetchMock = vi.fn(async (input: string | URL | Request) => {
       const url = new URL(String(input))
