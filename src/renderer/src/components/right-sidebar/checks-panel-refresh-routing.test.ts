@@ -57,6 +57,16 @@ describe('resolveChecksPanelRefreshRoute', () => {
     expect(route.strategy).not.toBe('github')
   })
 
+  // Why: unlinked active Gitee must refresh via hosted-review, not GitHub-only.
+  it('routes an active unlinked Gitee review through hosted-review, not GitHub', () => {
+    expect(
+      resolveChecksPanelRefreshRoute({
+        activeReviewProvider: 'gitee',
+        ...NO_LINKS
+      })
+    ).toEqual({ provider: 'gitee', strategy: 'hosted-review' })
+  })
+
   it.each([
     { provider: 'bitbucket', links: { linkedBitbucketPR: 8 } },
     { provider: 'azure-devops', links: { linkedAzureDevOpsPR: 9 } },

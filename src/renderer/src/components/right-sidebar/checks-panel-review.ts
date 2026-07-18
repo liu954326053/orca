@@ -33,21 +33,25 @@ export function selectChecksPanelReview({
   if (gitLabHostedReview) {
     return gitLabHostedReview
   }
-  const giteeHostedReview =
-    hostedReview?.provider === 'gitee' && hostedReview.number === linkedGiteePR
-      ? hostedReview
-      : null
-  if (giteeHostedReview) {
-    // Why: Gitee metadata is display-only; preserve its provider identity so
-    // mutation-capable consumers can reject it instead of treating it as GitHub.
-    return giteeHostedReview
-  }
-  const hasNonGitHubLinkedReview =
+  const hasOtherNonGitHubLinkedReview =
     linkedGitLabMR !== null ||
     linkedBitbucketPR !== null ||
     linkedAzureDevOpsPR !== null ||
-    linkedGiteaPR !== null ||
-    linkedGiteePR !== null
+    linkedGiteaPR !== null
+  // Why: unlinked branch-discovered Gitee only when no other non-GitHub link exists;
+  // explicit linkedGiteePR still requires number match so stale cache cannot leak.
+  const giteeHostedReview =
+    hostedReview?.provider === 'gitee' &&
+    (linkedGiteePR === null
+      ? !hasOtherNonGitHubLinkedReview
+      : hostedReview.number === linkedGiteePR)
+      ? hostedReview
+      : null
+  if (giteeHostedReview) {
+    // Why: Gitee metadata is display-only; preserve provider identity for mutation gates.
+    return giteeHostedReview
+  }
+  const hasNonGitHubLinkedReview = hasOtherNonGitHubLinkedReview || linkedGiteePR !== null
   if (hasNonGitHubLinkedReview) {
     return null
   }

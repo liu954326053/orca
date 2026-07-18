@@ -51,7 +51,8 @@ export function resolveChecksPanelRefreshRoute({
   if (linkedGiteaPR !== null) {
     return { provider: 'gitea', strategy: 'hosted-review' }
   }
-  if (linkedGiteePR !== null) {
+  // Why: branch-discovered Gitee sets activeReviewProvider without linkedGiteePR; stay off GitHub-only refresh.
+  if (activeReviewProvider === 'gitee' || linkedGiteePR !== null) {
     return { provider: 'gitee', strategy: 'hosted-review' }
   }
   return { provider: 'github', strategy: 'github' }

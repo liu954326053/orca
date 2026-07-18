@@ -111,6 +111,66 @@ describe('selectChecksPanelReview', () => {
     ).toBe(review)
   })
 
+  // Why: website-created Gitee PRs leave linkedGiteePR null; branch discovery must still show.
+  it('uses a branch-discovered Gitee review when the worktree has no linked Gitee PR', () => {
+    const review = makeGiteeReview({ number: 18 })
+    const staleGitHubPR = makePR({ number: 12, state: 'merged' })
+
+    expect(
+      selectChecksPanelReview({
+        hostedReview: review,
+        pr: staleGitHubPR,
+        linkedGitLabMR: null,
+        linkedBitbucketPR: null,
+        linkedAzureDevOpsPR: null,
+        linkedGiteaPR: null,
+        linkedGiteePR: null
+      })
+    ).toBe(review)
+  })
+
+  // Why: multi-provider links are allowed; an explicit non-Gitee link must beat unlinked Gitee discovery.
+  it.each([
+    { provider: 'GitLab', linkedGitLabMR: 7 },
+    { provider: 'Bitbucket', linkedBitbucketPR: 8 },
+    { provider: 'Azure DevOps', linkedAzureDevOpsPR: 9 },
+    { provider: 'Gitea', linkedGiteaPR: 10 }
+  ])(
+    'does not use branch-discovered Gitee when a $provider review is explicitly linked',
+    (links) => {
+      const review = makeGiteeReview({ number: 18 })
+
+      expect(
+        selectChecksPanelReview({
+          hostedReview: review,
+          pr: makePR({ number: 12, state: 'merged' }),
+          linkedGitLabMR: links.linkedGitLabMR ?? null,
+          linkedBitbucketPR: links.linkedBitbucketPR ?? null,
+          linkedAzureDevOpsPR: links.linkedAzureDevOpsPR ?? null,
+          linkedGiteaPR: links.linkedGiteaPR ?? null,
+          linkedGiteePR: null
+        })
+      ).toBeNull()
+    }
+  )
+
+  // Why: explicit link mismatch must not leak Gitee cache or stale GitHub PR.
+  it('returns null when linkedGiteePR disagrees with the cached Gitee review number', () => {
+    const review = makeGiteeReview({ number: 18 })
+
+    expect(
+      selectChecksPanelReview({
+        hostedReview: review,
+        pr: makePR({ number: 12 }),
+        linkedGitLabMR: null,
+        linkedBitbucketPR: null,
+        linkedAzureDevOpsPR: null,
+        linkedGiteaPR: null,
+        linkedGiteePR: 99
+      })
+    ).toBeNull()
+  })
+
   it('uses GitHub PR cache when no non-GitHub review is linked', () => {
     const selected = selectChecksPanelReview({
       hostedReview: null,
