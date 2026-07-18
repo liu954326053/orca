@@ -1,12 +1,9 @@
 import {
-  mapGiteeIssueComment,
   mapGiteeIssue,
   mapGiteeLabel,
-  type GiteeCommentInfo,
   type GiteeIssueInfo,
   type GiteeIssueState,
   type GiteeLabelInfo,
-  type RawGiteeComment,
   type RawGiteeIssue,
   type RawGiteeLabel
 } from './issue-mappers'
@@ -298,44 +295,4 @@ export async function listGiteeLabels(
     const mapped = mapGiteeLabel(r)
     return mapped ? [mapped] : []
   })
-}
-
-export async function listGiteeIssueComments(
-  repoPath: string,
-  issueNumber: string | number,
-  connectionId?: string | null,
-  execOptions: HostedReviewExecutionOptions = {}
-): Promise<GiteeCommentInfo[]> {
-  const repo = await resolveRepo(repoPath, connectionId, execOptions)
-  if (!repo) {
-    return []
-  }
-  const raw = await requestJson<RawGiteeComment[]>(
-    repo,
-    `/repos/${encodedRepoPath(repo)}/issues/${encodeURIComponent(String(issueNumber))}/comments`
-  )
-  return (raw ?? []).flatMap((r) => {
-    const mapped = mapGiteeIssueComment(r)
-    return mapped ? [mapped] : []
-  })
-}
-
-export async function addGiteeIssueComment(
-  repoPath: string,
-  issueNumber: string | number,
-  commentBody: string,
-  connectionId?: string | null,
-  execOptions: HostedReviewExecutionOptions = {}
-): Promise<GiteeCommentInfo | null> {
-  const repo = await resolveRepo(repoPath, connectionId, execOptions)
-  if (!repo) {
-    return null
-  }
-  const raw = await mutateJson<RawGiteeComment>(
-    repo,
-    'POST',
-    `/repos/${encodedRepoPath(repo)}/issues/${encodeURIComponent(String(issueNumber))}/comments`,
-    { body: commentBody }
-  )
-  return raw ? mapGiteeIssueComment(raw) : null
 }

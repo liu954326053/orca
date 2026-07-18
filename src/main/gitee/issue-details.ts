@@ -1,6 +1,7 @@
 import type { HostedReviewExecutionOptions } from '../source-control/hosted-review-git-options'
 import type { GiteeCommentInfo, GiteeIssueInfo } from './issue-mappers'
-import { getGiteeIssue, listGiteeIssueComments } from './issues'
+import { listGiteeIssueComments } from './issue-comments'
+import { getGiteeIssue } from './issues'
 
 export async function getGiteeIssueWithComments(
   repoPath: string,

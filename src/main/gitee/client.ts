@@ -21,10 +21,8 @@ import {
   type GiteeApiRequestErrorKind
 } from './request'
 import {
-  addGiteeIssueComment,
   createGiteeIssue,
   getGiteeIssue,
-  listGiteeIssueComments,
   listGiteeIssues,
   listGiteeLabels,
   updateGiteeIssue,
@@ -32,6 +30,7 @@ import {
   type ListGiteeIssuesOptions,
   type UpdateGiteeIssueInput
 } from './issues'
+import { addGiteeIssueComment, listGiteeIssueComments } from './issue-comments'
 import { getGiteeIssueWithComments } from './issue-details'
 import type {
   GiteeCommentInfo,

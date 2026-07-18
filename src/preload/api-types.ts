@@ -1954,7 +1954,7 @@ export type PreloadApi = {
       assignee?: string
       labels?: string[]
     }) => Promise<{
-      items: Array<{
+      items: ({
         number: string
         title: string
         state: 'open' | 'closed' | 'progressing' | 'rejected'
@@ -1963,7 +1963,7 @@ export type PreloadApi = {
         body: string
         updatedAt: string
         author: string | null
-      }>
+      })[]
       error?: { type: string; message: string }
     }>
     getIssue: (args: {
@@ -1980,13 +1980,13 @@ export type PreloadApi = {
       body: string
       updatedAt: string
       author: string | null
-      comments: Array<{
+      comments: ({
         id: number
         body: string
         author: string | null
         createdAt: string
         updatedAt: string
-      }>
+      })[]
     } | null>
     listPulls: (args: {
       repoPath: string
@@ -1996,7 +1996,7 @@ export type PreloadApi = {
       page?: number
       perPage?: number
     }) => Promise<{
-      items: Array<{
+      items: ({
         number: number
         title: string
         state: 'open' | 'closed' | 'merged' | 'draft'
@@ -2005,7 +2005,7 @@ export type PreloadApi = {
         updatedAt: string
         mergeable: PRMergeableState
         headSha?: string
-      }>
+      })[]
       error?: { type: string; message: string }
     }>
     createIssue: (args: {

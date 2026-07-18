@@ -9,15 +9,14 @@ vi.mock('../git/runner', () => ({
 }))
 
 import {
-  addGiteeIssueComment,
   createGiteeIssue,
   getGiteeIssue,
   GiteeIssueApiError,
-  listGiteeIssueComments,
   listGiteeIssues,
   listGiteeLabels,
   updateGiteeIssue
 } from './issues'
+import { addGiteeIssueComment, listGiteeIssueComments } from './issue-comments'
 import { _resetGiteeRepoRefCache } from './repository-ref'
 
 const OLD_ENV = process.env
