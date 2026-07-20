@@ -2974,6 +2974,11 @@ export type GlobalSettings = {
    *  off never mount the overlay. Toggling takes effect immediately in the
    *  current session (no relaunch) because it is purely renderer-side. */
   experimentalPet: boolean
+  /** External desktop-pet event stream (`pet.events.subscribe`,
+   *  docs/reference/pet-event-protocol.md). Default OFF: an outward push
+   *  channel should be explicit opt-in. Turning it off terminates live
+   *  subscriptions immediately (settings IPC calls cleanupSubscriptionsByPrefix). */
+  petEventStreamEnabled: boolean
   /** Legacy persisted key from before the sidekick -> pet rename. Read only
    *  during migration; new writes use experimentalPet. */
   experimentalSidekick?: boolean

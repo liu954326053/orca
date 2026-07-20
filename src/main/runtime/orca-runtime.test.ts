@@ -1,5 +1,6 @@
 /* eslint-disable max-lines -- Why: runtime behavior is stateful and cross-cutting, so these tests stay in one file to preserve the end-to-end invariants around handles, waits, and graph sync. */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { PetSubscriberInfo } from '../../shared/pet-events'
 import type * as GitUsernameModule from '../git/git-username'
 import { performance } from 'node:perf_hooks'
 import { EventEmitter } from 'node:events'
@@ -31882,5 +31883,52 @@ describe('OrcaRuntimeService', () => {
         vi.useRealTimers()
       }
     })
+  })
+})
+
+describe('pet event stream gate and subscriber registry', () => {
+  it('is disabled without a store and tracks the setting value otherwise', () => {
+    expect(new OrcaRuntimeService().isPetEventStreamEnabled()).toBe(false)
+    const off = new OrcaRuntimeService({
+      getSettings: () => ({ petEventStreamEnabled: false })
+    } as never)
+    expect(off.isPetEventStreamEnabled()).toBe(false)
+    const on = new OrcaRuntimeService({
+      getSettings: () => ({ petEventStreamEnabled: true })
+    } as never)
+    expect(on.isPetEventStreamEnabled()).toBe(true)
+  })
+
+  it('registers, lists, counts, and unregisters subscribers with change notifications', () => {
+    const runtime = new OrcaRuntimeService()
+    const changes: PetSubscriberInfo[][] = []
+    const off = runtime.onPetSubscribersChanged((list) => changes.push(list))
+
+    const entry = runtime.registerPetSubscriber({
+      subscriptionId: 'pet-events-1',
+      clientName: 'MyPet 1.0'
+    })
+    expect(entry.eventCount).toBe(0)
+    expect(runtime.listPetSubscribers()).toEqual([
+      expect.objectContaining({
+        subscriptionId: 'pet-events-1',
+        clientName: 'MyPet 1.0',
+        eventCount: 0
+      })
+    ])
+    expect(changes).toHaveLength(1)
+
+    // The RPC handler bumps eventCount through the returned entry reference.
+    entry.eventCount += 5
+    expect(runtime.listPetSubscribers()[0]!.eventCount).toBe(5)
+
+    runtime.unregisterPetSubscriber('pet-events-1')
+    expect(runtime.listPetSubscribers()).toEqual([])
+    expect(changes).toHaveLength(2)
+
+    // Unknown ids are a no-op without a spurious change event.
+    runtime.unregisterPetSubscriber('pet-events-missing')
+    expect(changes).toHaveLength(2)
+    off()
   })
 })

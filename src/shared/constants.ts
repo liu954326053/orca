@@ -370,6 +370,9 @@ export function getDefaultSettings(homedir: string): GlobalSettings {
     // Why: off by default — opt-in cosmetic joke feature. Leaving the default
     // false keeps the overlay unmounted for users who never enable it.
     experimentalPet: false,
+    // Why: off by default — an outward event-push channel must be explicit
+    // opt-in; the Settings toggle is the only way to enable it.
+    petEventStreamEnabled: false,
     experimentalActivity: false,
     experimentalActivityDefaultedOffForAllUsers: true,
     experimentalTerminalAttention: false,

@@ -262,6 +262,39 @@ describe('registerSettingsHandlers', () => {
     expect(agentAwakeService.setEnabled).not.toHaveBeenCalled()
   })
 
+  it('cuts live pet event stream subscriptions when the stream toggle turns off', () => {
+    const onPetEventStreamDisabled = vi.fn()
+    store.getSettings.mockReturnValue({ petEventStreamEnabled: true })
+    store.updateSettings.mockReturnValue({ petEventStreamEnabled: false })
+    registerSettingsHandlers(store as never, undefined, onPetEventStreamDisabled)
+
+    const handler = handleMock.mock.calls.find((call) => call[0] === 'settings:set')?.[1] as (
+      _event: unknown,
+      args: unknown
+    ) => unknown
+
+    handler(settingsInvokeEvent, { petEventStreamEnabled: false })
+
+    expect(onPetEventStreamDisabled).toHaveBeenCalledOnce()
+  })
+
+  it('keeps pet subscriptions when the stream toggle stays on or is untouched', () => {
+    const onPetEventStreamDisabled = vi.fn()
+    store.getSettings.mockReturnValue({ petEventStreamEnabled: false })
+    store.updateSettings.mockReturnValue({ petEventStreamEnabled: true })
+    registerSettingsHandlers(store as never, undefined, onPetEventStreamDisabled)
+
+    const handler = handleMock.mock.calls.find((call) => call[0] === 'settings:set')?.[1] as (
+      _event: unknown,
+      args: unknown
+    ) => unknown
+
+    handler(settingsInvokeEvent, { petEventStreamEnabled: true })
+    handler(settingsInvokeEvent, { defaultTuiAgent: 'codex' })
+
+    expect(onPetEventStreamDisabled).not.toHaveBeenCalled()
+  })
+
   it('prepares local worktree roots when workspace directory changes', async () => {
     store.getSettings.mockReturnValue({ workspaceDir: '/old/workspaces', nestWorkspaces: false })
     store.updateSettings.mockReturnValue({ workspaceDir: '/new/workspaces', nestWorkspaces: false })

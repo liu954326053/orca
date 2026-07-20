@@ -5444,7 +5444,10 @@
             "defaultViewLabel": "기본 기본 채팅 보기",
             "defaultViewTerminal": "Terminal 채팅",
             "defaultViewNative": "네이티브 채팅"
-          }
+          },
+          "d7e3563238": "이 머신의 외부 앱(예: 나만의 데스크톱 펫)이 로컬 런타임 소켓을 통해 에이전트 상태 변경과 선별된 메시지를 구독할 수 있게 합니다 — docs/reference/pet-event-protocol.md 참조. 기본값은 꺼짐이며, 끄면 현재 구독자가 즉시 연결 해제됩니다.",
+          "89b1e36613": "펫 이벤트 스트림",
+          "45cbeaaad6": "외부 데스크톱 펫이 로컬 런타임 소켓으로 Orca의 에이전트 상태와 메시지를 구독할 수 있게 합니다."
         },
         "FloatingWorkspacePane": {
           "aeaf76fda9": "상태 표시줄",
@@ -7616,6 +7619,13 @@
               "title": "네이티브 채팅",
               "description": "지원되는 에이전트 터미널 세션의 데스크톱 채팅 화면을 미리 봅니다.",
               "grok": "grok"
+            },
+            "petEventStream": {
+              "title": "펫 이벤트 스트림",
+              "description": "외부 데스크톱 펫이 에이전트 상태와 메시지를 구독할 수 있게 합니다.",
+              "eventStream": "이벤트 스트림",
+              "subscribe": "구독",
+              "external": "외부"
             }
           }
         },
@@ -9203,6 +9213,20 @@
           "availability": "이용 가능:",
           "testFlight": "TestFlight",
           "androidApk": "Android APK"
+        },
+        "PetEventStreamPanel": {
+          "7516bea4d8": "펫 프로젝트를 연 상태에서 Cursor, Claude Code 또는 유사한 에이전트에 이 프롬프트를 붙여넣으면 통합을 구현해 줍니다. 시크릿은 포함되지 않습니다. 인증 토큰은 실행 시 메타데이터 파일에서 읽습니다.",
+          "38a3d3ef11": "에이전트 프롬프트 복사",
+          "cb8c69cfcf": "통합 가이드 복사",
+          "082267b568": "펫은 이 런타임 메타데이터 파일을 읽고 로컬 소켓으로 연결한 뒤 자체 clientName으로 구독합니다. 전체 프로토콜 참조: docs/reference/pet-event-protocol.md.",
+          "77ccf84ed0": "펫 연결",
+          "70fea41430": "개 이벤트",
+          "8d55c8fc08": "아직 구독 중인 앱이 없습니다. 아래 메타데이터 파일을 펫에 지정해 연결하세요.",
+          "f22f77a319": "활성 구독자",
+          "8bd97295a6": "복사에 실패했습니다.",
+          "unnamedApp": "이름 없는 앱",
+          "copiedGuide": "통합 가이드를 복사했습니다.",
+          "copiedPrompt": "에이전트 통합 프롬프트를 복사했습니다."
         }
       },
       "right": {

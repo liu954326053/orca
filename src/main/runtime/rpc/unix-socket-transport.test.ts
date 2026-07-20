@@ -74,4 +74,73 @@ describe('UnixSocketTransport', () => {
     vi.advanceTimersByTime(500)
     expect(socket.writes).toHaveLength(1)
   })
+
+  it('replyStream writes multiple frames and endStream stops the keepalive', () => {
+    const transport = new UnixSocketTransport({
+      endpoint: '/tmp/orca-runtime-rpc-test.sock',
+      kind: 'unix',
+      keepaliveIntervalMs: 100
+    })
+    const socket = new FakeSocket()
+    let streamContext:
+      | { replyStream?: (response: string) => void; endStream?: () => void }
+      | undefined
+
+    transport.onMessage((_msg, _reply, context) => {
+      context?.startKeepalive()
+      streamContext = context
+    })
+
+    ;(transport as unknown as UnixSocketTransportInternals).handleConnection(
+      socket as unknown as Socket
+    )
+    socket.emit('data', '{"id":"s","method":"pet.events.subscribe"}\n')
+
+    streamContext?.replyStream?.('{"frame":1}')
+    streamContext?.replyStream?.('{"frame":2}')
+    expect(socket.writes).toEqual(['{"frame":1}\n', '{"frame":2}\n'])
+
+    // The keepalive keeps running while the stream is open, defeating the
+    // socket idle timeout for quiet subscriptions.
+    vi.advanceTimersByTime(100)
+    expect(socket.writes).toHaveLength(3)
+    expect(socket.writes[2]).toBe('{"_keepalive":true}\n')
+
+    streamContext?.endStream?.()
+    vi.advanceTimersByTime(500)
+    expect(socket.writes).toHaveLength(3)
+  })
+
+  it('replyStream drops frames after the socket closes and still aborts', () => {
+    const transport = new UnixSocketTransport({
+      endpoint: '/tmp/orca-runtime-rpc-test.sock',
+      kind: 'unix',
+      keepaliveIntervalMs: 100
+    })
+    const socket = new FakeSocket()
+    let aborted = false
+    let streamContext: { replyStream?: (response: string) => void } | undefined
+
+    transport.onMessage((_msg, _reply, context) => {
+      context?.signal?.addEventListener(
+        'abort',
+        () => {
+          aborted = true
+        },
+        { once: true }
+      )
+      streamContext = context
+    })
+
+    ;(transport as unknown as UnixSocketTransportInternals).handleConnection(
+      socket as unknown as Socket
+    )
+    socket.emit('data', '{"id":"s","method":"pet.events.subscribe"}\n')
+
+    socket.destroy()
+    expect(aborted).toBe(true)
+
+    streamContext?.replyStream?.('{"frame":1}')
+    expect(socket.writes).toEqual([])
+  })
 })

@@ -239,6 +239,8 @@ import {
 } from '../agent-trust-presets'
 import { markRemoteAgentWorkspaceTrusted } from '../remote-agent-trust-presets'
 import { applyAgentStatusHooksEnabled } from '../agent-hooks/managed-agent-hook-controls'
+import type { AgentStatusStreamEvent } from '../agent-hooks/server'
+import type { PetSubscriberInfo } from '../../shared/pet-events'
 import {
   isWindowsAbsolutePathLike,
   isPathInsideOrEqual,
@@ -877,6 +879,7 @@ type RuntimeStore = {
     agentDefaultEnv?: GlobalSettings['agentDefaultEnv']
     terminalWindowsShell?: GlobalSettings['terminalWindowsShell']
     agentStatusHooksEnabled?: GlobalSettings['agentStatusHooksEnabled']
+    petEventStreamEnabled?: GlobalSettings['petEventStreamEnabled']
     defaultTaskSource?: GlobalSettings['defaultTaskSource']
     defaultTaskViewPreset?: GlobalSettings['defaultTaskViewPreset']
     visibleTaskProviders?: GlobalSettings['visibleTaskProviders']
@@ -2584,6 +2587,9 @@ export class OrcaRuntimeService {
   private readonly onTerminalSideEffects: ((batch: TerminalSideEffectBatch) => void) | null
   private terminalSideEffectConsumerAvailable = false
   private readonly getAgentStatusSnapshotFn: (() => AgentStatusIpcPayload[]) | null
+  private readonly subscribeAgentStatusStreamFn:
+    | ((listener: (event: AgentStatusStreamEvent) => void) => () => void)
+    | null
   private readonly buildAgentHookPtyEnv: (() => Record<string, string>) | null
   private readonly getDesktopWindowStatusFn: () => RuntimeDesktopWindowStatus
   private accountServices: RuntimeAccountServices | null = null
@@ -2614,6 +2620,9 @@ export class OrcaRuntimeService {
       // terminal output. worktree.ps reads this at query time so mobile shows the
       // same inline agent rows the desktop sidebar does — same source, 1:1.
       getAgentStatusSnapshot?: () => AgentStatusIpcPayload[]
+      // Why: push counterpart to getAgentStatusSnapshot — the desktop-pet RPC
+      // (pet.events.subscribe) streams live status events instead of polling.
+      subscribeAgentStatusStream?: (listener: (event: AgentStatusStreamEvent) => void) => () => void
       // Why: codex-home paths for the Agent Session History scan must be sourced
       // here, not via the window-only registerCoreHandlers path — that path never
       // runs under `orca serve`, so remote/SSH hosts would silently drop
@@ -2629,6 +2638,7 @@ export class OrcaRuntimeService {
       this.agentDetector = new AgentDetector(stats)
     }
     this.getAgentStatusSnapshotFn = deps?.getAgentStatusSnapshot ?? null
+    this.subscribeAgentStatusStreamFn = deps?.subscribeAgentStatusStream ?? null
     // Why: configure the shared AiVault scan cache from a serve-mode-reachable
     // seam so the aiVault.listSessions RPC includes managed-Codex + WSL sessions
     // even on headless `orca serve` hosts where registerCoreHandlers never runs.
@@ -7893,6 +7903,68 @@ export class OrcaRuntimeService {
     return candidates
       ? recentTerminalPathCandidatesIncludePath(candidates, pathText, absolutePath)
       : false
+  }
+
+  /** Live agent-status events for the desktop-pet RPC. No-op safe when the
+   *  dep is absent (tests, exotic serve constructions). */
+  onAgentStatusStream(listener: (event: AgentStatusStreamEvent) => void): () => void {
+    return this.subscribeAgentStatusStreamFn?.(listener) ?? (() => {})
+  }
+
+  getAgentStatusSnapshot(): AgentStatusIpcPayload[] {
+    return this.getAgentStatusSnapshotFn?.() ?? []
+  }
+
+  /** Settings gate for the external pet event stream. Absent store means the
+   *  safe default: disabled. */
+  isPetEventStreamEnabled(): boolean {
+    return this.store?.getSettings().petEventStreamEnabled === true
+  }
+
+  private readonly petSubscribers = new Map<string, PetSubscriberInfo>()
+  private readonly petSubscriberListeners = new Set<(subscribers: PetSubscriberInfo[]) => void>()
+
+  registerPetSubscriber(info: { subscriptionId: string; clientName?: string }): PetSubscriberInfo {
+    const entry: PetSubscriberInfo = {
+      subscriptionId: info.subscriptionId,
+      clientName: info.clientName ?? null,
+      connectedAt: Date.now(),
+      eventCount: 0
+    }
+    this.petSubscribers.set(info.subscriptionId, entry)
+    this.notifyPetSubscribersChanged()
+    return entry
+  }
+
+  unregisterPetSubscriber(subscriptionId: string): void {
+    if (this.petSubscribers.delete(subscriptionId)) {
+      this.notifyPetSubscribersChanged()
+    }
+  }
+
+  listPetSubscribers(): PetSubscriberInfo[] {
+    return Array.from(this.petSubscribers.values())
+  }
+
+  onPetSubscribersChanged(listener: (subscribers: PetSubscriberInfo[]) => void): () => void {
+    this.petSubscriberListeners.add(listener)
+    return () => {
+      this.petSubscriberListeners.delete(listener)
+    }
+  }
+
+  private notifyPetSubscribersChanged(): void {
+    if (this.petSubscriberListeners.size === 0) {
+      return
+    }
+    const snapshot = this.listPetSubscribers()
+    for (const listener of this.petSubscriberListeners) {
+      try {
+        listener(snapshot)
+      } catch (error) {
+        console.error('[runtime] pet-subscribers listener threw', error)
+      }
+    }
   }
 
   registerSubscriptionCleanup(
@@ -15615,9 +15687,7 @@ export class OrcaRuntimeService {
           : {}),
         ...(args.linkedGiteaPR !== undefined ? { linkedGiteaPR: args.linkedGiteaPR } : {}),
         ...(args.linkedGiteePR !== undefined ? { linkedGiteePR: args.linkedGiteePR } : {}),
-        ...(args.linkedGiteeIssue !== undefined
-          ? { linkedGiteeIssue: args.linkedGiteeIssue }
-          : {}),
+        ...(args.linkedGiteeIssue !== undefined ? { linkedGiteeIssue: args.linkedGiteeIssue } : {}),
         ...(effectiveCreatedWithAgent ? { createdWithAgent: effectiveCreatedWithAgent } : {}),
         ...(args.comment !== undefined ? { comment: args.comment } : {}),
         ...(args.manualOrder !== undefined ? { manualOrder: args.manualOrder } : {}),
@@ -16575,9 +16645,7 @@ export class OrcaRuntimeService {
         // is reused; only omitted fields should preserve existing metadata.
         ...(args.linkedGiteaPR !== undefined ? { linkedGiteaPR: args.linkedGiteaPR } : {}),
         ...(args.linkedGiteePR !== undefined ? { linkedGiteePR: args.linkedGiteePR } : {}),
-        ...(args.linkedGiteeIssue !== undefined
-          ? { linkedGiteeIssue: args.linkedGiteeIssue }
-          : {}),
+        ...(args.linkedGiteeIssue !== undefined ? { linkedGiteeIssue: args.linkedGiteeIssue } : {}),
         ...(args.pushTarget ? { pushTarget: args.pushTarget } : {}),
         ...(args.workspaceStatus ? { workspaceStatus: args.workspaceStatus as never } : {}),
         ...(args.manualOrder !== undefined ? { manualOrder: args.manualOrder } : {}),

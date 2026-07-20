@@ -9,6 +9,7 @@ import { NumberField, SettingsSwitch } from './SettingsFormControls'
 import { translate } from '@/i18n/i18n'
 import { NativeChatExperimentalSetting } from './NativeChatExperimentalSetting'
 import { EphemeralVmsExperimentalSetting } from './EphemeralVmsExperimentalSetting'
+import { PetEventStreamPanel } from './PetEventStreamPanel'
 import {
   MAX_AGENT_HIBERNATION_IDLE_MS,
   MIN_AGENT_HIBERNATION_IDLE_MS,
@@ -34,6 +35,9 @@ export function ExperimentalPane({
 }: ExperimentalPaneProps): React.JSX.Element {
   const searchQuery = useAppStore((s) => s.settingsSearchQuery)
   const showPet = matchesSettingsSearch(searchQuery, [getExperimentalSearchEntry().pet])
+  const showPetEventStream = matchesSettingsSearch(searchQuery, [
+    getExperimentalSearchEntry().petEventStream
+  ])
   const showAgentsView = matchesSettingsSearch(searchQuery, [
     getExperimentalSearchEntry().agentsView
   ])
@@ -100,6 +104,57 @@ export function ExperimentalPane({
               />
             </button>
           </div>
+        </SearchableSetting>
+      ) : null}
+
+      {showPetEventStream ? (
+        <SearchableSetting
+          title={translate(
+            'auto.components.settings.ExperimentalPane.89b1e36613',
+            'Pet event stream'
+          )}
+          description={translate(
+            'auto.components.settings.ExperimentalPane.45cbeaaad6',
+            "Let external desktop pets subscribe to Orca's agent state and messages over the local runtime socket."
+          )}
+          keywords={getExperimentalSearchEntry().petEventStream.keywords}
+          className="space-y-3 py-2"
+          id="experimental-pet-event-stream"
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0 shrink space-y-1.5">
+              <Label>
+                {translate(
+                  'auto.components.settings.ExperimentalPane.89b1e36613',
+                  'Pet event stream'
+                )}
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                {translate(
+                  'auto.components.settings.ExperimentalPane.d7e3563238',
+                  'Allows external apps on this machine (for example your own desktop pet) to subscribe to agent state changes and curated messages via the local runtime socket — see docs/reference/pet-event-protocol.md. Off by default; turning it off disconnects current subscribers immediately.'
+                )}
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={settings.petEventStreamEnabled}
+              onClick={() => {
+                updateSettings({ petEventStreamEnabled: !settings.petEventStreamEnabled })
+              }}
+              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border border-transparent transition-colors ${
+                settings.petEventStreamEnabled ? 'bg-foreground' : 'bg-muted-foreground/30'
+              }`}
+            >
+              <span
+                className={`inline-block h-3.5 w-3.5 transform rounded-full bg-background shadow-sm transition-transform ${
+                  settings.petEventStreamEnabled ? 'translate-x-4' : 'translate-x-0.5'
+                }`}
+              />
+            </button>
+          </div>
+          {settings.petEventStreamEnabled ? <PetEventStreamPanel /> : null}
         </SearchableSetting>
       ) : null}
 

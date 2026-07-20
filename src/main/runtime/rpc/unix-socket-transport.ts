@@ -213,9 +213,22 @@ export class UnixSocketTransport implements RpcTransport {
       }
     }
 
+    // Why: streaming dispatches (pet.events.subscribe) write many frames for
+    // one request, so they bypass `reply`'s single-use guard. `replied` stays
+    // false, which keeps the keepalive timer alive — that is what lets an
+    // idle-but-open subscription survive the 30 s socket idle timeout.
+    const replyStream = (response: string): void => {
+      if (!socket.destroyed && socket.writable) {
+        socket.write(`${response}\n`)
+      }
+    }
+    const endStream = (): void => cleanupDispatch(false)
+
     this.messageHandler?.(rawMessage, reply, {
       signal: abortController.signal,
-      startKeepalive
+      startKeepalive,
+      replyStream,
+      endStream
     })
   }
 }

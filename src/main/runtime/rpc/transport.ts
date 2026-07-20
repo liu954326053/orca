@@ -14,6 +14,13 @@
 export type RpcMessageContext = {
   signal: AbortSignal
   startKeepalive: () => void
+  // Why: streaming methods (pet.events.subscribe) write many frames for one
+  // request. `replyStream` bypasses the transport's single-reply guard;
+  // `endStream` releases the dispatch's bookkeeping (keepalive timer,
+  // in-flight abort entry) once the stream's final frame is out. Absent on
+  // transports/paths that only support one-shot replies.
+  replyStream?: (response: string) => void
+  endStream?: () => void
 }
 
 export type RpcTransport = {

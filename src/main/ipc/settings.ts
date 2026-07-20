@@ -52,7 +52,8 @@ const APPEARANCE_MENU_KEYS: readonly (keyof GlobalSettings)[] = [
 
 export function registerSettingsHandlers(
   store: Store,
-  agentAwakeService?: AgentAwakeService
+  agentAwakeService?: AgentAwakeService,
+  onPetEventStreamDisabled?: () => void
 ): void {
   store.onSettingsChanged((updates, _settings, originWebContentsId) => {
     for (const window of BrowserWindow.getAllWindows()) {
@@ -139,6 +140,11 @@ export function registerSettingsHandlers(
     })
     if ('keepComputerAwakeWhileAgentsRun' in sanitizedArgs) {
       agentAwakeService?.setEnabled(result.keepComputerAwakeWhileAgentsRun)
+    }
+    // Why: the pet event stream is an outward push channel — flipping it off
+    // must cut live subscriptions immediately, not just refuse new ones.
+    if ('petEventStreamEnabled' in sanitizedArgs && result.petEventStreamEnabled === false) {
+      onPetEventStreamDisabled?.()
     }
     if (
       'agentStatusHooksEnabled' in sanitizedArgs &&

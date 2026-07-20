@@ -155,7 +155,9 @@ export function registerCoreHandlers(
   // not load-bearing; both register independent ipcMain channels.
   registerDiagnosticsHandlers()
   registerComputerUsePermissionHandlers()
-  registerSettingsHandlers(store, agentAwakeService)
+  registerSettingsHandlers(store, agentAwakeService, () =>
+    runtime.cleanupSubscriptionsByPrefix('pet-events-')
+  )
   registerSkillsHandlers(store)
   if (automations) {
     registerAutomationHandlers(store, automations)

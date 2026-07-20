@@ -1266,12 +1266,33 @@ export function hasPendingAgentResultText(source: AgentHookSource, body: unknown
     envelope?.hookEventName ??
     record.hook_event_name ??
     record.hookEventName
+  if (source === 'kimi' && (eventName === 'Stop' || eventName === 'StopFailure')) {
+    // Why: Kimi Stop has no transcript_path (its payload is session_id/cwd
+    // only) — pending text means a locatable session wire file that the retry
+    // re-reads after the CLI finishes flushing it. Fall through when no
+    // session id is advertised so a transcript_path payload (or Grok-style
+    // discovery) can still use the generic branches below.
+    const sessionId = record.session_id ?? envelope?.session_id
+    if (typeof sessionId === 'string' && sessionId.length > 0) {
+      return true
+    }
+  }
   if (source === 'antigravity' && eventName === 'Stop') {
     if (isAntigravityStopStillBusy(record)) {
       return false
     }
     const transcriptPath = record.transcriptPath ?? record.transcript_path
     return typeof transcriptPath === 'string' && transcriptPath.trim().length > 0
+  }
+  if (eventName === 'Stop' || eventName === 'StopFailure' || eventName === 'SessionEnd') {
+    // Why: claude/kimi-style sources read the final text from the transcript at
+    // Stop time, but the transcript can flush after the Stop POST — without a
+    // retry that done keeps an empty lastAssistantMessage forever. Fall through
+    // (not false) when no transcript is advertised so Grok discovery still runs.
+    const transcriptPath = record.transcript_path ?? record.transcriptPath
+    if (typeof transcriptPath === 'string' && transcriptPath.trim().length > 0) {
+      return true
+    }
   }
   const pendingGrokDiscovery = preparePendingGrokResultDiscovery(source, body)
   if (pendingGrokDiscovery) {
@@ -1420,6 +1441,78 @@ function findLastExtractedTranscriptLineText(
   }
 
   return undefined
+}
+
+// Why: Kimi Code's Stop payload carries only session_id/cwd — no transcript_path
+// and no last_assistant_message (verified against the CLI docs and a captured
+// live payload). The final assistant text lives in the session wire file at
+// <KIMI_CODE_HOME>/sessions/<wd_*>/session_<id>/agents/<agent>/wire.jsonl;
+// locate it with a bounded sync scan, same spirit as the sync transcript reads.
+const KIMI_SESSION_ID_SAFE = /^[\w-]+$/
+
+function resolveKimiSessionWirePath(sessionId: unknown): string | undefined {
+  if (typeof sessionId !== 'string' || !KIMI_SESSION_ID_SAFE.test(sessionId)) {
+    return undefined
+  }
+  const kimiHome = process.env.KIMI_CODE_HOME?.trim() || join(homedir(), '.kimi-code')
+  let projectDirs: string[]
+  try {
+    projectDirs = readdirSync(join(kimiHome, 'sessions'))
+  } catch {
+    return undefined
+  }
+  for (const projectDir of projectDirs) {
+    const agentsDir = join(kimiHome, 'sessions', projectDir, sessionId, 'agents')
+    let agentIds: string[]
+    try {
+      agentIds = readdirSync(agentsDir)
+    } catch {
+      continue
+    }
+    // Why: the primary agent is "main" by convention (see ai-vault's kimi
+    // scanner); check it first so subagent wires never win over it.
+    for (const agentId of ['main', ...agentIds.filter((id) => id !== 'main')]) {
+      const wirePath = join(agentsDir, agentId, 'wire.jsonl')
+      try {
+        if (statSync(wirePath).isFile()) {
+          return wirePath
+        }
+      } catch {
+        // Keep looking.
+      }
+    }
+  }
+  return undefined
+}
+
+// Why: Kimi wire lines wrap assistant output as context.append_loop_event →
+// content.part records whose part.type is 'text'.
+function extractKimiAssistantTextFromLine(line: string): string | undefined {
+  try {
+    const record = JSON.parse(line) as Record<string, unknown>
+    if (record.type !== 'context.append_loop_event') {
+      return undefined
+    }
+    const event = record.event as Record<string, unknown> | undefined
+    if (event?.type !== 'content.part') {
+      return undefined
+    }
+    const part = event.part as Record<string, unknown> | undefined
+    if (part?.type !== 'text') {
+      return undefined
+    }
+    return typeof part.text === 'string' && part.text.trim().length > 0 ? part.text : undefined
+  } catch {
+    return undefined
+  }
+}
+
+function readLastAssistantFromKimiWire(sessionId: unknown): string | undefined {
+  const wirePath = resolveKimiSessionWirePath(sessionId)
+  if (!wirePath) {
+    return undefined
+  }
+  return readLastTextFromTranscriptOnce(wirePath, extractKimiAssistantTextFromLine)
 }
 
 function extractClaudeToolFields(
@@ -2852,6 +2945,12 @@ function normalizeKimiEvent(
   const interrupted =
     eventName === 'Stop' && hookPayload['is_interrupt'] === true ? true : undefined
 
+  // Why: Kimi Stop carries no text fields at all — fall back to the session
+  // wire file so a done can still carry the final assistant message.
+  const lastAssistantMessage =
+    snapshot.lastAssistantMessage ??
+    (stateName === 'done' ? readLastAssistantFromKimiWire(hookPayload.session_id) : undefined)
+
   return parseAgentStatusPayload(
     JSON.stringify({
       state: stateName,
@@ -2861,7 +2960,7 @@ function normalizeKimiEvent(
       agentType: 'kimi',
       toolName: snapshot.toolName,
       toolInput: snapshot.toolInput,
-      lastAssistantMessage: snapshot.lastAssistantMessage,
+      lastAssistantMessage,
       interrupted
     })
   )

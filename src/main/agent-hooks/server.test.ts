@@ -290,6 +290,66 @@ describe('AgentHookServer listener replay', () => {
     }
   })
 
+  it('lets a same-prompt done redelivery carrying fresh text through the interrupted-done suppression', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(1_000)
+    try {
+      const server = new AgentHookServer()
+      server.ingestRemote(
+        {
+          paneKey: PANE,
+          tabId: 'tab-1',
+          worktreeId: 'wt-1',
+          payload: { state: 'working', prompt: 'long task', agentType: 'claude' }
+        },
+        'conn-1'
+      )
+      const baseline = server.getStatusSnapshot()[0]
+
+      vi.setSystemTime(1_500)
+      expect(
+        server.inferInterrupt({
+          paneKey: PANE,
+          baselineUpdatedAt: baseline.receivedAt,
+          baselineStateStartedAt: baseline.stateStartedAt,
+          baselinePrompt: 'long task',
+          baselineAgentType: 'claude',
+          intent: 'ctrl-c'
+        })
+      ).toBe(true)
+
+      vi.setSystemTime(2_000)
+      server.ingestRemote(
+        {
+          paneKey: PANE,
+          tabId: 'tab-1',
+          worktreeId: 'wt-1',
+          payload: {
+            state: 'done',
+            prompt: 'long task',
+            agentType: 'claude',
+            interrupted: true,
+            lastAssistantMessage: 'final answer'
+          }
+        },
+        'conn-1'
+      )
+
+      expect(server.getStatusSnapshot()).toEqual([
+        expect.objectContaining({
+          paneKey: PANE,
+          state: 'done',
+          prompt: 'long task',
+          agentType: 'claude',
+          interrupted: true,
+          lastAssistantMessage: 'final answer'
+        })
+      ])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('rejects inferred interrupts when a same-millisecond prompt update changed the row', () => {
     vi.useFakeTimers()
     vi.setSystemTime(1_000)
@@ -1375,6 +1435,66 @@ describe('AgentHookServer listener replay', () => {
         observedInCurrentRuntime: true
       })
     ])
+  })
+
+  it('streams full status events and cleared notifications to stream subscribers', () => {
+    const server = new AgentHookServer()
+    const listener = vi.fn()
+    server.subscribeAgentStatusStream(listener)
+
+    server.ingestRemote(
+      {
+        paneKey: PANE,
+        tabId: 'tab-1',
+        worktreeId: 'wt-1',
+        payload: { state: 'working', prompt: 'task', agentType: 'claude', toolName: 'Bash' }
+      },
+      'conn-1'
+    )
+
+    expect(listener).toHaveBeenCalledWith({
+      kind: 'status',
+      event: expect.objectContaining({
+        paneKey: PANE,
+        tabId: 'tab-1',
+        worktreeId: 'wt-1',
+        connectionId: 'conn-1',
+        receivedAt: expect.any(Number),
+        stateStartedAt: expect.any(Number),
+        payload: expect.objectContaining({ state: 'working', toolName: 'Bash' })
+      })
+    })
+
+    listener.mockClear()
+    server.clearPaneState(PANE)
+    expect(listener).toHaveBeenCalledWith({ kind: 'cleared', paneKey: PANE })
+  })
+
+  it('keeps stream subscribers independent of the renderer fanout listener slot', () => {
+    const server = new AgentHookServer()
+    const streamListener = vi.fn()
+    const removed = vi.fn()
+    const kept = vi.fn()
+    server.subscribeAgentStatusStream(streamListener)
+    server.setListener(vi.fn())
+    server.setListener(null)
+    const unsubscribe = server.subscribeAgentStatusStream(removed)
+    server.subscribeAgentStatusStream(kept)
+    unsubscribe()
+
+    server.ingestRemote(
+      {
+        paneKey: PANE,
+        tabId: 'tab-1',
+        worktreeId: 'wt-1',
+        payload: { state: 'working', agentType: 'claude' }
+      },
+      'conn-1'
+    )
+
+    expect(streamListener).toHaveBeenCalledTimes(1)
+    expect(kept).toHaveBeenCalledTimes(1)
+    expect(removed).not.toHaveBeenCalled()
   })
 
   it('notifies status-change subscribers when a working status is dropped or cleared', () => {
@@ -5521,6 +5641,141 @@ describe('Copilot hook normalization', () => {
         })
       )
     } finally {
+      server.stop()
+      rmSync(tmpDir, { recursive: true, force: true })
+    }
+  })
+
+  it.each(['claude', 'kimi'] as const)(
+    'updates %s Stop with final transcript text after a non-blocking retry',
+    async (source) => {
+      const server = new AgentHookServer()
+      const tmpDir = mkdtempSync(join(tmpdir(), `orca-${source}-transcript-retry-`))
+      const transcriptPath = join(tmpDir, 'transcript.jsonl')
+      writeFileSync(transcriptPath, '')
+      await server.start({ env: 'production' })
+      try {
+        const env = server.buildPtyEnv()
+        const listener = vi.fn()
+        server.setListener(listener)
+        const streamListener = vi.fn()
+        server.subscribeAgentStatusStream(streamListener)
+
+        const postHook = (payload: Record<string, unknown>): Promise<Response> =>
+          fetch(`http://127.0.0.1:${env.ORCA_AGENT_HOOK_PORT}/hook/${source}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Orca-Agent-Hook-Token': env.ORCA_AGENT_HOOK_TOKEN
+            },
+            body: JSON.stringify(buildBody(payload))
+          })
+
+        await postHook({ hook_event_name: 'UserPromptSubmit', prompt: 'ship it' })
+        const response = await postHook({
+          hook_event_name: 'Stop',
+          transcript_path: transcriptPath
+        })
+        expect(response.status).toBe(204)
+        expect(listener).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            payload: expect.objectContaining({ state: 'done', lastAssistantMessage: undefined })
+          })
+        )
+
+        writeFileSync(
+          transcriptPath,
+          `${JSON.stringify({
+            type: 'assistant',
+            message: {
+              role: 'assistant',
+              content: [{ type: 'text', text: 'Done after transcript flush.' }]
+            }
+          })}\n`
+        )
+        // Covers retry attempt 1 (50ms) and, on a slow host, attempt 2 (+100ms).
+        await new Promise((resolve) => setTimeout(resolve, 220))
+
+        const withText = expect.objectContaining({
+          payload: expect.objectContaining({
+            state: 'done',
+            agentType: source,
+            lastAssistantMessage: 'Done after transcript flush.'
+          })
+        })
+        // The retried redelivery must reach both the IPC fanout and stream subs.
+        expect(listener).toHaveBeenLastCalledWith(withText)
+        expect(streamListener).toHaveBeenLastCalledWith(
+          expect.objectContaining({ kind: 'status', event: withText })
+        )
+      } finally {
+        server.stop()
+        rmSync(tmpDir, { recursive: true, force: true })
+      }
+    }
+  )
+
+  it('updates Kimi Stop with wire-file text after a non-blocking retry', async () => {
+    const server = new AgentHookServer()
+    const tmpDir = mkdtempSync(join(tmpdir(), 'orca-kimi-wire-retry-'))
+    const sessionId = 'session_retry-1'
+    const wireDir = join(tmpDir, 'sessions', 'wd_proj_abc', sessionId, 'agents', 'main')
+    mkdirSync(wireDir, { recursive: true })
+    writeFileSync(join(wireDir, 'wire.jsonl'), '')
+    vi.stubEnv('KIMI_CODE_HOME', tmpDir)
+    await server.start({ env: 'production' })
+    try {
+      const env = server.buildPtyEnv()
+      const listener = vi.fn()
+      server.setListener(listener)
+      const streamListener = vi.fn()
+      server.subscribeAgentStatusStream(streamListener)
+
+      const postHook = (payload: Record<string, unknown>): Promise<Response> =>
+        fetch(`http://127.0.0.1:${env.ORCA_AGENT_HOOK_PORT}/hook/kimi`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Orca-Agent-Hook-Token': env.ORCA_AGENT_HOOK_TOKEN
+          },
+          body: JSON.stringify(buildBody(payload))
+        })
+
+      await postHook({ hook_event_name: 'UserPromptSubmit', prompt: 'ship it' })
+      // Why: real Kimi Stop payloads carry only session_id/cwd — no
+      // transcript_path and no last_assistant_message.
+      const response = await postHook({ hook_event_name: 'Stop', session_id: sessionId })
+      expect(response.status).toBe(204)
+      expect(listener).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          payload: expect.objectContaining({ state: 'done', lastAssistantMessage: undefined })
+        })
+      )
+
+      writeFileSync(
+        join(wireDir, 'wire.jsonl'),
+        `${JSON.stringify({
+          type: 'context.append_loop_event',
+          event: { type: 'content.part', part: { type: 'text', text: 'Done after wire flush.' } }
+        })}\n`
+      )
+      // Covers retry attempt 1 (50ms) and, on a slow host, attempt 2 (+100ms).
+      await new Promise((resolve) => setTimeout(resolve, 220))
+
+      const withText = expect.objectContaining({
+        payload: expect.objectContaining({
+          state: 'done',
+          agentType: 'kimi',
+          lastAssistantMessage: 'Done after wire flush.'
+        })
+      })
+      // The retried redelivery must reach both the IPC fanout and stream subs.
+      expect(listener).toHaveBeenLastCalledWith(withText)
+      expect(streamListener).toHaveBeenLastCalledWith(
+        expect.objectContaining({ kind: 'status', event: withText })
+      )
+    } finally {
+      vi.unstubAllEnvs()
       server.stop()
       rmSync(tmpDir, { recursive: true, force: true })
     }

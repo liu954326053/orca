@@ -15,6 +15,7 @@ import { registerWorkspaceCleanupHandlers } from '../ipc/workspace-cleanup'
 import { getLocalPtyProvider, registerPtyHandlers } from '../ipc/pty'
 import { registerDaemonManagementHandlers } from '../ipc/pty-management'
 import { registerSshHandlers } from '../ipc/ssh'
+import { registerPetEventStreamHandlers } from '../ipc/pet-event-stream'
 import { registerRemoteWorkspaceHandlers } from '../ipc/remote-workspace'
 import { browserManager } from '../browser/browser-manager'
 import { hasSystemMediaAccess, requestSystemMediaAccess } from '../browser/browser-media-access'
@@ -135,6 +136,7 @@ export function attachMainWindowServices(
       })
   }
   registerSshHandlers(store, () => mainWindow, runtime)
+  registerPetEventStreamHandlers(runtime, () => mainWindow, app.getPath('userData'))
   registerRemoteWorkspaceHandlers(store, () => mainWindow)
   registerFileDropRelay(mainWindow)
   // Why: setupAutoUpdater's first getAutoUpdater() call synchronously

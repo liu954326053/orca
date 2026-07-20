@@ -5459,7 +5459,10 @@
             "defaultViewLabel": "Vista predeterminada de chat nativo",
             "defaultViewTerminal": "Chat en terminal",
             "defaultViewNative": "Chat nativo"
-          }
+          },
+          "d7e3563238": "Permite que apps externas en esta máquina (por ejemplo tu propia mascota de escritorio) se suscriban a cambios de estado de los agentes y mensajes seleccionados a través del socket del runtime local — consulta docs/reference/pet-event-protocol.md. Desactivado por defecto; al desactivarlo se desconectan los suscriptores actuales de inmediato.",
+          "89b1e36613": "Flujo de eventos de mascota",
+          "45cbeaaad6": "Permite que mascotas de escritorio externas se suscriban al estado y los mensajes de los agentes de Orca a través del socket del runtime local."
         },
         "FloatingWorkspacePane": {
           "aeaf76fda9": "Barra de estado",
@@ -7631,6 +7634,13 @@
               "title": "Chat nativo",
               "description": "Previsualiza la interfaz de chat de escritorio para sesiones de terminal de agentes compatibles.",
               "grok": "grok"
+            },
+            "petEventStream": {
+              "title": "Flujo de eventos de mascota",
+              "description": "Permite que mascotas de escritorio externas se suscriban al estado y mensajes de los agentes.",
+              "eventStream": "flujo de eventos",
+              "subscribe": "suscribirse",
+              "external": "externa"
             }
           }
         },
@@ -9203,6 +9213,20 @@
           "availability": "Disponible en",
           "testFlight": "TestFlight",
           "androidApk": "APK de Android"
+        },
+        "PetEventStreamPanel": {
+          "7516bea4d8": "Pega el prompt del agente en Cursor, Claude Code o un agente similar con tu proyecto de mascota abierto: implementará la integración por ti. No incluye secretos: el token de autenticación se lee del archivo de metadatos en tiempo de ejecución.",
+          "38a3d3ef11": "Copiar prompt del agente",
+          "cb8c69cfcf": "Copiar guía de integración",
+          "082267b568": "Tu mascota lee este archivo de metadatos del runtime, se conecta por el socket local y se suscribe con su propio clientName. Referencia completa del protocolo: docs/reference/pet-event-protocol.md.",
+          "77ccf84ed0": "Conecta tu mascota",
+          "70fea41430": "eventos",
+          "8d55c8fc08": "Aún no hay apps suscritas. Apunta tu mascota al archivo de metadatos de abajo para conectarla.",
+          "f22f77a319": "Suscriptores activos",
+          "8bd97295a6": "Error al copiar.",
+          "unnamedApp": "App sin nombre",
+          "copiedGuide": "Guía de integración copiada.",
+          "copiedPrompt": "Prompt de integración del agente copiado."
         }
       },
       "right": {
