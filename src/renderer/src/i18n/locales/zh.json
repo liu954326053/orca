@@ -5444,7 +5444,10 @@
             "defaultViewLabel": "默认原生聊天视图",
             "defaultViewTerminal": "终端聊天",
             "defaultViewNative": "原生聊天"
-          }
+          },
+          "d7e3563238": "允许本机上的外部程序（比如你自己的桌面宠物）通过本地运行时 socket 订阅代理状态变化和精选消息——详见 docs/reference/pet-event-protocol.md。默认关闭；关闭时会立即断开当前订阅者。",
+          "89b1e36613": "宠物事件流",
+          "45cbeaaad6": "让外部桌面宠物通过本地运行时 socket 订阅 Orca 的代理状态与消息。"
         },
         "FloatingWorkspacePane": {
           "aeaf76fda9": "状态栏",
@@ -7616,6 +7619,13 @@
               "title": "原生聊天",
               "description": "预览受支持的智能体终端会话的桌面聊天界面。",
               "grok": "grok"
+            },
+            "petEventStream": {
+              "title": "宠物事件流",
+              "description": "让外部桌面宠物订阅代理状态与消息。",
+              "eventStream": "事件流",
+              "subscribe": "订阅",
+              "external": "外部"
             }
           }
         },
@@ -9203,6 +9213,20 @@
           "availability": "可用平台：",
           "testFlight": "TestFlight",
           "androidApk": "Android APK"
+        },
+        "PetEventStreamPanel": {
+          "7516bea4d8": "把 agent 提示词粘贴到 Cursor、Claude Code 或类似的 agent 工具中（打开你的宠物项目），它会为你完成接入。文本中不包含任何密钥：auth token 由接入代码在运行时从元数据文件读取。",
+          "38a3d3ef11": "复制 Agent 提示词",
+          "cb8c69cfcf": "复制接入说明",
+          "082267b568": "你的宠物读取此运行时元数据文件，通过本地 socket 连接，并用自己的 clientName 订阅。完整协议参考：docs/reference/pet-event-protocol.md。",
+          "77ccf84ed0": "连接你的宠物",
+          "70fea41430": "条事件",
+          "8d55c8fc08": "还没有程序订阅。让你的宠物读取下方的元数据文件即可接入。",
+          "f22f77a319": "当前订阅者",
+          "8bd97295a6": "复制失败。",
+          "unnamedApp": "未命名应用",
+          "copiedGuide": "已复制接入说明。",
+          "copiedPrompt": "已复制 Agent 接入提示词。"
         }
       },
       "right": {

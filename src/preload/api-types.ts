@@ -20,6 +20,7 @@ import type {
   LocalLogTailWatchArgs
 } from '../shared/local-log-tail-types'
 import type { ReadClipboardTextOptions } from '../shared/clipboard-text'
+import type { PetSubscriberInfo } from '../shared/pet-events'
 import type { AppIdentity } from '../shared/app-identity'
 import type { MobileRelayStatus } from '../shared/mobile-relay-status'
 import type { MobilePairingConnectionMode } from '../shared/mobile-pairing-connection-mode'
@@ -1954,7 +1955,7 @@ export type PreloadApi = {
       assignee?: string
       labels?: string[]
     }) => Promise<{
-      items: ({
+      items: {
         number: string
         title: string
         state: 'open' | 'closed' | 'progressing' | 'rejected'
@@ -1963,7 +1964,7 @@ export type PreloadApi = {
         body: string
         updatedAt: string
         author: string | null
-      })[]
+      }[]
       error?: { type: string; message: string }
     }>
     getIssue: (args: {
@@ -1980,13 +1981,13 @@ export type PreloadApi = {
       body: string
       updatedAt: string
       author: string | null
-      comments: ({
+      comments: {
         id: number
         body: string
         author: string | null
         createdAt: string
         updatedAt: string
-      })[]
+      }[]
     } | null>
     listPulls: (args: {
       repoPath: string
@@ -1996,7 +1997,7 @@ export type PreloadApi = {
       page?: number
       perPage?: number
     }) => Promise<{
-      items: ({
+      items: {
         number: number
         title: string
         state: 'open' | 'closed' | 'merged' | 'draft'
@@ -2005,7 +2006,7 @@ export type PreloadApi = {
         updatedAt: string
         mergeable: PRMergeableState
         headSha?: string
-      })[]
+      }[]
       error?: { type: string; message: string }
     }>
     createIssue: (args: {
@@ -2015,9 +2016,7 @@ export type PreloadApi = {
       title: string
       body?: string
       labels?: string[]
-    }) => Promise<
-      { ok: true; number: string | number; url: string } | { ok: false; error: string }
-    >
+    }) => Promise<{ ok: true; number: string | number; url: string } | { ok: false; error: string }>
     updateIssue: (args: {
       repoPath: string
       repoId?: string | null
@@ -2411,6 +2410,16 @@ export type PreloadApi = {
     importPetBundle: () => Promise<CustomPet | null>
     read: (id: string, fileName: string, kind?: 'image' | 'bundle') => Promise<ArrayBuffer | null>
     delete: (id: string, fileName: string, kind?: 'image' | 'bundle') => Promise<void>
+  }
+  petEventStream: {
+    listSubscribers: () => Promise<PetSubscriberInfo[]>
+    onSubscribersChanged: (callback: (subscribers: PetSubscriberInfo[]) => void) => () => void
+    getIntegrationGuide: () => Promise<{
+      metadataPath: string
+      endpoint: string | null
+      guideMarkdown: string
+      agentPromptMarkdown: string
+    }>
   }
   browser: BrowserApi
   emulator: EmulatorApi

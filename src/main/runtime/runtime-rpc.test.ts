@@ -24,6 +24,7 @@ import {
 } from '../../shared/terminal-stream-protocol'
 import { decrypt, deriveSharedKey, encrypt, generateKeyPair } from './rpc/e2ee-crypto'
 import { DeviceRegistry } from './device-registry'
+import type { AgentStatusStreamEvent } from '../agent-hooks/server'
 
 vi.mock('../git/worktree', () => ({
   listWorktrees: vi.fn().mockResolvedValue([
@@ -3966,6 +3967,166 @@ describe('OrcaRuntimeRpcServer', () => {
       } finally {
         realPrototype.exec = originalExec
       }
+    })
+  })
+
+  describe('streaming methods over the Unix socket transport', () => {
+    type StreamingSession = {
+      socket: Socket
+      frames: Record<string, unknown>[]
+    }
+
+    // Why: unlike openFramedSession, the client stays open past the first
+    // frame — streaming requests deliver many frames for one request id.
+    function openStreamingSession(
+      endpoint: string,
+      request: Record<string, unknown>
+    ): StreamingSession {
+      const frames: Record<string, unknown>[] = []
+      const socket = createConnection(endpoint)
+      let buffer = ''
+      socket.setEncoding('utf8')
+      socket.on('data', (chunk: string) => {
+        buffer += chunk
+        let newlineIndex = buffer.indexOf('\n')
+        while (newlineIndex !== -1) {
+          const raw = buffer.slice(0, newlineIndex).trim()
+          buffer = buffer.slice(newlineIndex + 1)
+          if (raw) {
+            frames.push(JSON.parse(raw) as Record<string, unknown>)
+          }
+          newlineIndex = buffer.indexOf('\n')
+        }
+      })
+      socket.on('connect', () => {
+        socket.write(`${JSON.stringify(request)}\n`)
+      })
+      return { socket, frames }
+    }
+
+    function resultFrames(session: StreamingSession): Record<string, unknown>[] {
+      return session.frames
+        .filter((frame) => frame.streaming === true)
+        .map((frame) => frame.result as Record<string, unknown>)
+    }
+
+    it('pet.events.subscribe streams ready/snapshot/state and ends on unsubscribe', async () => {
+      const userDataPath = mkdtempSync(join(tmpdir(), 'orca-runtime-rpc-'))
+      let streamListener: ((event: AgentStatusStreamEvent) => void) | undefined
+      const store = { getSettings: () => ({ petEventStreamEnabled: true }) }
+      const runtime = new OrcaRuntimeService(store as never, undefined, {
+        subscribeAgentStatusStream: (listener) => {
+          streamListener = listener
+          return () => {}
+        }
+      })
+      const server = new OrcaRuntimeRpcServer({ runtime, userDataPath, enableWebSocket: false })
+      await server.start()
+
+      const metadata = readRuntimeMetadata(userDataPath)
+      const endpoint = metadata!.transports[0]!.endpoint
+      const session = openStreamingSession(endpoint, {
+        id: 'sub_1',
+        authToken: metadata!.authToken,
+        method: 'pet.events.subscribe'
+      })
+
+      await waitFor(() => resultFrames(session).length >= 2)
+      const [ready, snapshot] = resultFrames(session)
+      expect(ready).toMatchObject({ type: 'ready', subscriptionId: expect.any(String) })
+      expect(snapshot).toEqual({ type: 'snapshot', agents: [] })
+
+      streamListener?.({
+        kind: 'status',
+        event: {
+          paneKey: 'p1',
+          connectionId: null,
+          payload: { state: 'working', prompt: 'task', toolName: 'Bash' },
+          receivedAt: Date.now(),
+          stateStartedAt: Date.now()
+        }
+      })
+      await waitFor(() => resultFrames(session).length >= 3)
+      expect(resultFrames(session)[2]).toMatchObject({
+        type: 'state',
+        paneKey: 'p1',
+        state: 'working'
+      })
+
+      // A second one-shot connection unsubscribes; the stream gets its `end`.
+      const unsubResponse = await sendRequest(endpoint, {
+        id: 'unsub_1',
+        authToken: metadata!.authToken,
+        method: 'pet.events.unsubscribe',
+        params: { subscriptionId: ready!.subscriptionId }
+      })
+      expect(unsubResponse).toMatchObject({ ok: true, result: { unsubscribed: true } })
+      await waitFor(() => resultFrames(session).some((frame) => frame.type === 'end'))
+
+      session.socket.destroy()
+      await server.stop()
+    })
+
+    it('reaps the subscription when the pet socket drops mid-stream', async () => {
+      const userDataPath = mkdtempSync(join(tmpdir(), 'orca-runtime-rpc-'))
+      const store = { getSettings: () => ({ petEventStreamEnabled: true }) }
+      const runtime = new OrcaRuntimeService(store as never, undefined, {
+        subscribeAgentStatusStream: () => () => {}
+      })
+      const server = new OrcaRuntimeRpcServer({ runtime, userDataPath, enableWebSocket: false })
+      await server.start()
+
+      const metadata = readRuntimeMetadata(userDataPath)
+      const session = openStreamingSession(metadata!.transports[0]!.endpoint, {
+        id: 'sub_2',
+        authToken: metadata!.authToken,
+        method: 'pet.events.subscribe'
+      })
+      await waitFor(() => resultFrames(session).length >= 2)
+
+      session.socket.destroy()
+      const cleanups = runtime['subscriptionCleanups'] as Map<string, unknown>
+      await waitFor(() => cleanups.size === 0)
+
+      await server.stop()
+    })
+
+    it('rejects streaming calls without auth like any other method', async () => {
+      const userDataPath = mkdtempSync(join(tmpdir(), 'orca-runtime-rpc-'))
+      const runtime = new OrcaRuntimeService()
+      const server = new OrcaRuntimeRpcServer({ runtime, userDataPath, enableWebSocket: false })
+      await server.start()
+
+      const metadata = readRuntimeMetadata(userDataPath)
+      const response = await sendRequest(metadata!.transports[0]!.endpoint, {
+        id: 'sub_3',
+        authToken: 'wrong',
+        method: 'pet.events.subscribe'
+      })
+      expect(response).toMatchObject({ ok: false, error: { code: 'unauthorized' } })
+
+      await server.stop()
+    })
+
+    it('rejects pet.events.subscribe with a structured code when the stream is disabled', async () => {
+      const userDataPath = mkdtempSync(join(tmpdir(), 'orca-runtime-rpc-'))
+      // Why: no store means the safe default — the Settings toggle is off.
+      const runtime = new OrcaRuntimeService()
+      const server = new OrcaRuntimeRpcServer({ runtime, userDataPath, enableWebSocket: false })
+      await server.start()
+
+      const metadata = readRuntimeMetadata(userDataPath)
+      const response = await sendRequest(metadata!.transports[0]!.endpoint, {
+        id: 'sub_4',
+        authToken: metadata!.authToken,
+        method: 'pet.events.subscribe'
+      })
+      expect(response).toMatchObject({
+        ok: false,
+        error: { code: 'pet_event_stream_disabled' }
+      })
+
+      await server.stop()
     })
   })
 })

@@ -1488,6 +1488,94 @@ describe('shared agent-hook-listener', () => {
     ).toBe(false)
   })
 
+  it('treats Kimi Stop with a session id as pending result text', () => {
+    expect(
+      hasPendingAgentResultText('kimi', {
+        payload: { hook_event_name: 'Stop', session_id: 'session_abc', cwd: '/tmp/x' }
+      })
+    ).toBe(true)
+    expect(
+      hasPendingAgentResultText('kimi', {
+        payload: {
+          hook_event_name: 'Stop',
+          session_id: 'session_abc',
+          last_assistant_message: 'done'
+        }
+      })
+    ).toBe(false)
+    expect(
+      hasPendingAgentResultText('kimi', {
+        payload: { hook_event_name: 'UserPromptSubmit', session_id: 'session_abc', prompt: 'hi' }
+      })
+    ).toBe(false)
+    expect(
+      hasPendingAgentResultText('kimi', {
+        payload: { hook_event_name: 'Stop', cwd: '/tmp/x' }
+      })
+    ).toBe(false)
+  })
+
+  it('reads the final Kimi assistant text from the session wire file at Stop', () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), 'orca-kimi-wire-'))
+    vi.stubEnv('KIMI_CODE_HOME', tmpDir)
+    try {
+      const wireDir = join(tmpDir, 'sessions', 'wd_proj_abc', 'session_test-1', 'agents', 'main')
+      mkdirSync(wireDir, { recursive: true })
+      writeFileSync(
+        join(wireDir, 'wire.jsonl'),
+        `${[
+          JSON.stringify({
+            type: 'context.append_loop_event',
+            event: { type: 'content.part', part: { type: 'text', text: '最终答复：修复完成。' } }
+          }),
+          JSON.stringify({ type: 'context.append_loop_event', event: { type: 'step.end' } }),
+          JSON.stringify({ type: 'usage.record', model: 'kimi-code/k3' })
+        ].join('\n')}\n`
+      )
+
+      const event = normalizeHookPayload(
+        state,
+        'kimi',
+        {
+          paneKey: PANE_KEY,
+          payload: { hook_event_name: 'Stop', session_id: 'session_test-1', cwd: '/tmp/x' }
+        },
+        'production'
+      )
+      expect(event).not.toBeNull()
+      expect(event!.payload.state).toBe('done')
+      expect(event!.payload.agentType).toBe('kimi')
+      expect(event!.payload.lastAssistantMessage).toBe('最终答复：修复完成。')
+    } finally {
+      vi.unstubAllEnvs()
+      rmSync(tmpDir, { recursive: true, force: true })
+    }
+  })
+
+  it('returns no Kimi wire fallback for unsafe or unknown session ids', () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), 'orca-kimi-wire-'))
+    vi.stubEnv('KIMI_CODE_HOME', tmpDir)
+    try {
+      for (const sessionId of ['../escape', 'session_missing']) {
+        const event = normalizeHookPayload(
+          state,
+          'kimi',
+          {
+            paneKey: PANE_KEY,
+            payload: { hook_event_name: 'Stop', session_id: sessionId, cwd: '/tmp/x' }
+          },
+          'production'
+        )
+        expect(event).not.toBeNull()
+        expect(event!.payload.state).toBe('done')
+        expect(event!.payload.lastAssistantMessage).toBeUndefined()
+      }
+    } finally {
+      vi.unstubAllEnvs()
+      rmSync(tmpDir, { recursive: true, force: true })
+    }
+  })
+
   it('normalizes Grok hookEventName payloads and keeps prompt across tool events', () => {
     const prompt = normalizeHookPayload(
       state,

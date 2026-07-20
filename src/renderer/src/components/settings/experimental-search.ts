@@ -47,6 +47,35 @@ export const getExperimentalPaneSearchEntries = createLocalizedCatalog(
       ]
     },
     {
+      title: translate(
+        'auto.components.settings.experimental.search.petEventStream.title',
+        'Pet event stream'
+      ),
+      description: translate(
+        'auto.components.settings.experimental.search.petEventStream.description',
+        'Let external desktop pets subscribe to agent state and messages.'
+      ),
+      keywords: [
+        ...translateSearchKeyword(
+          'auto.components.settings.experimental.search.0d24759f14',
+          'experimental'
+        ),
+        ...translateSearchKeyword('auto.components.settings.experimental.search.051203d37c', 'pet'),
+        ...translateSearchKeyword(
+          'auto.components.settings.experimental.search.petEventStream.eventStream',
+          'event stream'
+        ),
+        ...translateSearchKeyword(
+          'auto.components.settings.experimental.search.petEventStream.subscribe',
+          'subscribe'
+        ),
+        ...translateSearchKeyword(
+          'auto.components.settings.experimental.search.petEventStream.external',
+          'external'
+        )
+      ]
+    },
+    {
       title: translate('auto.components.settings.experimental.search.ccc5548ac5', 'Agents View'),
       description: translate(
         'auto.components.settings.experimental.search.4d63251595',
@@ -203,6 +232,12 @@ function findEntry(title: string): SettingsSearchEntry {
 export function getExperimentalSearchEntry() {
   return {
     pet: findEntry(translate('auto.components.settings.experimental.search.87d99e634b', 'Pet')),
+    petEventStream: findEntry(
+      translate(
+        'auto.components.settings.experimental.search.petEventStream.title',
+        'Pet event stream'
+      )
+    ),
     agentsView: findEntry(
       translate('auto.components.settings.experimental.search.ccc5548ac5', 'Agents View')
     ),

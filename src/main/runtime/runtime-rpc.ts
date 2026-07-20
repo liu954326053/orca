@@ -830,7 +830,12 @@ export class OrcaRuntimeRpcServer {
     socketTransport.onMessage((msg, reply, context) => {
       void this.handleMessage(msg, context)
         .then((response) => {
-          reply(JSON.stringify(response))
+          // Why: streaming dispatches write their own frames via
+          // context.replyStream and resolve to null — there is no terminal
+          // envelope left to send here.
+          if (response) {
+            reply(JSON.stringify(response))
+          }
         })
         .catch((error) => {
           const message = error instanceof Error ? error.message : String(error)
@@ -963,15 +968,16 @@ export class OrcaRuntimeRpcServer {
     // bootstrap file.
   }
 
-  // Why: Unix socket messages use one-shot dispatch (single response per
-  // request) and the shared runtime auth token from the 0o600 metadata file.
-  // The transport layer owns socket lifecycle, keepalive writes, and the
-  // per-connection abort signal — this method just parses, auths, and
-  // dispatches. See design doc §3.1.
+  // Why: Unix socket messages historically used one-shot dispatch (single
+  // response per request) and the shared runtime auth token from the 0o600
+  // metadata file. Streaming methods (pet.events.subscribe) now ride the same
+  // transport via context.replyStream; the transport layer owns socket
+  // lifecycle, keepalive writes, and the per-connection abort signal — this
+  // method just parses, auths, and dispatches. See design doc §3.1.
   private async handleMessage(
     rawMessage: string,
     context?: RpcMessageContext
-  ): Promise<RpcResponse> {
+  ): Promise<RpcResponse | null> {
     // Why: empty messages are sent by the Unix socket transport layer when a
     // client exceeds the max message size. The transport closes the connection
     // after this response.
@@ -984,6 +990,27 @@ export class OrcaRuntimeRpcServer {
       return parsed.error
     }
     const request = parsed.request
+
+    // Why: streaming requests resolve to null — every frame (including error
+    // envelopes) goes out through context.replyStream, so the onMessage
+    // callback must not reply again. The keepalive timer runs for the whole
+    // stream so an idle-but-open subscription survives the socket idle
+    // timeout; endStream releases it when the handler finishes.
+    if (this.dispatcher.isStreaming(request.method)) {
+      if (!context?.replyStream) {
+        return this.buildError(
+          request.id,
+          'method_not_supported',
+          `Method ${request.method} requires a streaming transport`
+        )
+      }
+      context.startKeepalive()
+      await this.dispatcher.dispatchStreaming(request, context.replyStream, {
+        signal: context.signal
+      })
+      context.endStream?.()
+      return null
+    }
 
     // Why: long-poll admission fence. Short RPCs bypass the counter entirely
     // — it only guards handlers that can block for minutes. See §7 risk #2.

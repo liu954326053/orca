@@ -5482,7 +5482,10 @@
             "defaultViewLabel": "Default native chat view",
             "defaultViewTerminal": "Terminal chat",
             "defaultViewNative": "Native chat"
-          }
+          },
+          "d7e3563238": "Allows external apps on this machine (for example your own desktop pet) to subscribe to agent state changes and curated messages via the local runtime socket — see docs/reference/pet-event-protocol.md. Off by default; turning it off disconnects current subscribers immediately.",
+          "89b1e36613": "Pet event stream",
+          "45cbeaaad6": "Let external desktop pets subscribe to Orca's agent state and messages over the local runtime socket."
         },
         "FloatingWorkspacePane": {
           "aeaf76fda9": "Status Bar",
@@ -7691,6 +7694,13 @@
               "title": "Native chat",
               "description": "Preview the desktop chat surface for supported agent terminal sessions.",
               "grok": "grok"
+            },
+            "petEventStream": {
+              "title": "Pet event stream",
+              "description": "Let external desktop pets subscribe to agent state and messages.",
+              "eventStream": "event stream",
+              "subscribe": "subscribe",
+              "external": "external"
             }
           }
         },
@@ -9226,6 +9236,20 @@
           "availability": "Available on",
           "testFlight": "TestFlight",
           "androidApk": "Android APK"
+        },
+        "PetEventStreamPanel": {
+          "7516bea4d8": "Paste the agent prompt into Cursor, Claude Code, or a similar agent with your pet project open — it implements the integration for you. No secrets are included: the auth token is read from the metadata file at runtime.",
+          "38a3d3ef11": "Copy agent prompt",
+          "cb8c69cfcf": "Copy integration guide",
+          "082267b568": "Your pet reads this runtime metadata file, connects over the local socket, and subscribes with its own clientName. Full protocol reference: docs/reference/pet-event-protocol.md.",
+          "77ccf84ed0": "Connect your pet",
+          "70fea41430": "events",
+          "8d55c8fc08": "No apps are subscribed yet. Point your pet at the metadata file below to connect it.",
+          "f22f77a319": "Active subscribers",
+          "8bd97295a6": "Failed to copy.",
+          "unnamedApp": "Unnamed app",
+          "copiedGuide": "Copied integration guide.",
+          "copiedPrompt": "Copied agent integration prompt."
         }
       },
       "right": {

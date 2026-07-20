@@ -140,6 +140,7 @@ function createSettings(overrides: Partial<GlobalSettings> = {}): GlobalSettings
     experimentalMobile: false,
     mobileAutoRestoreFitMs: null,
     experimentalPet: false,
+    petEventStreamEnabled: false,
     experimentalActivity: true,
     experimentalTerminalAttention: false,
     compactWorktreeCards: false,

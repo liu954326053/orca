@@ -213,6 +213,7 @@ import { subscribeRuntimeEnvironmentFromPreload } from './runtime-environment-su
 import type { RuntimeEnvironmentSubscriptionHandle } from './runtime-environment-subscriptions'
 import type { HostedReviewForBranchArgs } from '../shared/hosted-review'
 import type { ReadClipboardTextOptions } from '../shared/clipboard-text'
+import type { PetSubscriberInfo } from '../shared/pet-events'
 import type {
   LocalhostWorktreeLabelResult,
   LocalhostWorktreeLabelRoute
@@ -2233,6 +2234,23 @@ const api = {
       ipcRenderer.invoke('pet:read', id, fileName, kind),
     delete: (id: string, fileName: string, kind?: 'image' | 'bundle'): Promise<void> =>
       ipcRenderer.invoke('pet:delete', id, fileName, kind)
+  },
+
+  petEventStream: {
+    listSubscribers: (): Promise<PetSubscriberInfo[]> =>
+      ipcRenderer.invoke('petEventStream:listSubscribers'),
+    onSubscribersChanged: (callback: (subscribers: PetSubscriberInfo[]) => void): (() => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, subscribers: PetSubscriberInfo[]) =>
+        callback(subscribers)
+      ipcRenderer.on('petEventStream:subscribersChanged', listener)
+      return () => ipcRenderer.removeListener('petEventStream:subscribersChanged', listener)
+    },
+    getIntegrationGuide: (): Promise<{
+      metadataPath: string
+      endpoint: string | null
+      guideMarkdown: string
+      agentPromptMarkdown: string
+    }> => ipcRenderer.invoke('petEventStream:getIntegrationGuide')
   },
 
   browser: {

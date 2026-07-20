@@ -44,6 +44,13 @@ export class RpcDispatcher {
     this.registry = buildRegistry(methods)
   }
 
+  // Why: transports that can carry streams (Unix socket via replyStream,
+  // WebSocket natively) ask this before choosing dispatch vs dispatchStreaming.
+  isStreaming(methodName: string): boolean {
+    const method = this.registry.get(methodName)
+    return method !== undefined && isStreamingMethod(method)
+  }
+
   async dispatch(request: RpcRequest, options?: { signal?: AbortSignal }): Promise<RpcResponse> {
     const meta = this.meta()
     const method = this.registry.get(request.method)

@@ -72,7 +72,7 @@ export type { AgentHookSource }
 // Stored in `state.lastStatusByPaneKey` via assignability — `AgentHookEventPayload`
 // is the declared map value, and the extra fields ride along untouched because
 // the shared module only writes/clears, never reads.
-type EnrichedAgentHookEventPayload = AgentHookEventPayload & {
+export type EnrichedAgentHookEventPayload = AgentHookEventPayload & {
   receivedAt: number
   stateStartedAt: number
 }
@@ -82,6 +82,17 @@ export type AgentHookStatusChangeEntry = {
   receivedAt: number
   observedInCurrentRuntime: boolean
 }
+
+// Why: the external desktop-pet RPC (`pet.events.subscribe`) needs the full
+// per-event payload (prompt/tool/assistant text), which neither the single
+// `onAgentStatus` slot (owned by the renderer fan-out, detached on window
+// close) nor the coarse status-change snapshot can provide. This multi-
+// listener stream mirrors the same fan-out points without touching them.
+export type AgentStatusStreamEvent =
+  | { kind: 'status'; event: EnrichedAgentHookEventPayload }
+  | { kind: 'cleared'; paneKey: string }
+
+type AgentStatusStreamListener = (event: AgentStatusStreamEvent) => void
 
 type StatusChangeListener = (statuses: AgentHookStatusChangeEntry[]) => void
 type PaneStatusClearListener = (paneKey: string) => void
@@ -470,6 +481,7 @@ export class AgentHookServer {
   private onAgentStatus: ((payload: EnrichedAgentHookEventPayload) => void) | null = null
   private onPaneStatusCleared: PaneStatusClearListener | null = null
   private statusChangeListeners = new Set<StatusChangeListener>()
+  private agentStatusStreamListeners = new Set<AgentStatusStreamListener>()
   // Why: directory that holds the on-disk endpoint file. Set via start()'s
   // `userDataPath` option so the class has no direct Electron dependency
   // (keeps it mockable in the vitest node environment).
@@ -528,6 +540,26 @@ export class AgentHookServer {
     this.statusChangeListeners.add(listener)
     return () => {
       this.statusChangeListeners.delete(listener)
+    }
+  }
+
+  subscribeAgentStatusStream(listener: AgentStatusStreamListener): () => void {
+    this.agentStatusStreamListeners.add(listener)
+    return () => {
+      this.agentStatusStreamListeners.delete(listener)
+    }
+  }
+
+  private notifyAgentStatusStreamListeners(event: AgentStatusStreamEvent): void {
+    if (this.agentStatusStreamListeners.size === 0) {
+      return
+    }
+    for (const listener of this.agentStatusStreamListeners) {
+      try {
+        listener(event)
+      } catch (err) {
+        console.error('[agent-hooks] status-stream listener threw', err)
+      }
     }
   }
 
@@ -833,13 +865,16 @@ export class AgentHookServer {
     }
     // Why: some TUIs can emit a delayed tool/working hook after Ctrl+C already
     // stopped the turn. Do not let that stale same-turn event resurrect the row.
+    // A done redelivery that finally carries the assistant text (retry fired
+    // once the transcript flushed) is not stale — let it through.
     if (
       previous?.payload.state === 'done' &&
       previous.payload.interrupted === true &&
       effectivePayload.payload.state === 'done' &&
       previous.payload.agentType === effectivePayload.payload.agentType &&
       previous.payload.prompt === effectivePayload.payload.prompt &&
-      Date.now() - previous.receivedAt <= INTERRUPTED_DONE_LATE_WORKING_SUPPRESSION_MS
+      Date.now() - previous.receivedAt <= INTERRUPTED_DONE_LATE_WORKING_SUPPRESSION_MS &&
+      !effectivePayload.payload.lastAssistantMessage
     ) {
       return previous
     }
@@ -871,6 +906,7 @@ export class AgentHookServer {
     this.scheduleStatusPersist()
     this.notifyStatusChangeListeners()
     this.onAgentStatus?.(enriched)
+    this.notifyAgentStatusStreamListeners({ kind: 'status', event: enriched })
     return enriched
   }
 
@@ -915,6 +951,9 @@ export class AgentHookServer {
         return
       }
     }
+    // Why: exponential backoff (50/100/200/400/800ms) — a flat 5×50ms budget
+    // gives up before the transcript flush lands under concurrent hook load.
+    const retryDelayMs = ASSISTANT_MESSAGE_RETRY_MS * 2 ** (attempt - 1)
     const timer = setTimeout(() => {
       try {
         this.assistantMessageRetryTimers.delete(original.paneKey)
@@ -922,7 +961,7 @@ export class AgentHookServer {
       } catch (err) {
         console.error('[agent-hooks] assistant message retry failed:', err)
       }
-    }, ASSISTANT_MESSAGE_RETRY_MS)
+    }, retryDelayMs)
     this.assistantMessageRetryTimers.set(original.paneKey, timer)
     if (typeof timer.unref === 'function') {
       timer.unref()
@@ -1194,6 +1233,7 @@ export class AgentHookServer {
       this.notifyStatusChangeListeners()
       for (const paneKey of clearedStatusPaneKeys) {
         this.onPaneStatusCleared?.(paneKey)
+        this.notifyAgentStatusStreamListeners({ kind: 'cleared', paneKey })
       }
     }
   }
@@ -1683,6 +1723,7 @@ export class AgentHookServer {
       this.scheduleStatusPersist()
       this.notifyStatusChangeListeners()
       this.onPaneStatusCleared?.(resolvedPaneKey)
+      this.notifyAgentStatusStreamListeners({ kind: 'cleared', paneKey: resolvedPaneKey })
     }
   }
 
